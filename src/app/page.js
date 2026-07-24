@@ -76,8 +76,8 @@ export default function DocumentExtractor({ presetId = null }) {
 
   // ── Popover: Table Connection ──
   const [platform, setPlatform] = useState('wps'); // 'wps' | 'feishu'
-  const [wpsUrl, setWpsUrl] = useState('https://365.kdocs.cn/l/cbGbLglUXASe?R=L1MvMQ==');
-  const [feishuUrl, setFeishuUrl] = useState('https://cli-aac44e92a2b89bd5.feishu.cn/base/[REDACTED_FEISHU_APP_TOKEN]?table=[REDACTED_FEISHU_TABLE_ID]');
+  const [wpsUrl, setWpsUrl] = useState('');
+  const [feishuUrl, setFeishuUrl] = useState('');
   const [wpsFileId, setWpsFileId] = useState('');
   const [feishuAppToken, setFeishuAppToken] = useState('');
   const [feishuTableId, setFeishuTableId] = useState('');
@@ -97,9 +97,9 @@ export default function DocumentExtractor({ presetId = null }) {
 
   // ── Popover: LLM Connection ──
   const [llmConfig, setLlmConfig] = useState({
-    provider: 'XiaoMi',
-    baseUrl: 'https://token-plan-cn.xiaomimimo.com/v1',
-    model: 'mimo-v2.5',
+    provider: '',
+    baseUrl: '',
+    model: '',
     apiKey: ''
   });
   const [llmConnected, setLlmConnected] = useState(false);
@@ -184,102 +184,87 @@ export default function DocumentExtractor({ presetId = null }) {
       });
   }, [presetId]);
 
-  // ── Load credentials & configurations ──
+  // ── Load credentials & configurations dynamically from /api/config ──
   useEffect(() => {
-    // Load LLM credentials
-    const defaultConf = {
-      id: 'default',
-      name: '默认配置',
-      provider: 'XiaoMi',
-      baseUrl: 'https://token-plan-cn.xiaomimimo.com/v1',
-      model: 'mimo-v2.5',
-      apiKey: '',
-      isDefault: true
-    };
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(configData => {
+        if (!configData) return;
 
-    const cachedList = localStorage.getItem('docex_llm_config_list');
-    let loadedList = [];
-    if (cachedList) {
-      try {
-        loadedList = JSON.parse(cachedList);
-      } catch { }
-    }
+        const defaultLLMConf = configData.defaultLLMConf;
+        const defaultWpsConf = configData.defaultWpsConf;
+        const defaultFeishuConf = configData.defaultFeishuConf;
+        const defaultUrls = configData.defaultUrls || {};
 
-    const hasDefault = loadedList.some(c => c.id === 'default');
-    if (!hasDefault) {
-      loadedList = [defaultConf, ...loadedList];
-    } else {
-      loadedList = loadedList.map(c => c.id === 'default' ? defaultConf : c);
-    }
-    setConfigList(loadedList);
+        // 1. Load LLM Credentials
+        const cachedList = localStorage.getItem('docex_llm_config_list');
+        let loadedList = [];
+        if (cachedList) {
+          try { loadedList = JSON.parse(cachedList); } catch { }
+        }
 
-    const activeId = localStorage.getItem('docex_active_llm_config_id') || 'default';
-    const activeConfig = loadedList.find(c => c.id === activeId) || defaultConf;
-    setLlmConfig({
-      provider: activeConfig.provider,
-      baseUrl: activeConfig.baseUrl,
-      model: activeConfig.model,
-      apiKey: activeConfig.apiKey
-    });
-    setSelectedConfigId(activeConfig.id);
-    setCustomConfigName(activeConfig.isDefault ? '' : activeConfig.name);
+        const hasDefault = loadedList.some(c => c.id === 'default');
+        if (!hasDefault) {
+          loadedList = [defaultLLMConf, ...loadedList];
+        } else {
+          loadedList = loadedList.map(c => c.id === 'default' ? defaultLLMConf : c);
+        }
+        setConfigList(loadedList);
 
-    // Load Table Configurations
-    const defaultWpsConf = {
-      id: 'wps_test',
-      name: 'WPS测试配置',
-      platform: 'wps',
-      appId: '',
-      appSecret: '',
-      url: 'https://365.kdocs.cn/l/cbGbLglUXASe',
-      isDefault: true
-    };
+        const activeId = localStorage.getItem('docex_active_llm_config_id') || 'default';
+        const activeConfig = loadedList.find(c => c.id === activeId) || defaultLLMConf;
+        setLlmConfig({
+          provider: activeConfig.provider,
+          baseUrl: activeConfig.baseUrl,
+          model: activeConfig.model,
+          apiKey: activeConfig.apiKey
+        });
+        setSelectedConfigId(activeConfig.id);
+        setCustomConfigName(activeConfig.isDefault ? '' : activeConfig.name);
 
-    const defaultFeishuConf = {
-      id: 'feishu_test',
-      name: '飞书测试配置',
-      platform: 'feishu',
-      appId: '',
-      appSecret: '',
-      url: 'https://dcnxzjtyczo8.feishu.cn/wiki/[REDACTED_FEISHU_APP_TOKEN]?table=[REDACTED_FEISHU_TABLE_ID]&view=vewOBDYdZ3',
-      isDefault: true
-    };
+        // 2. Load Table Configurations
+        const cachedTableList = localStorage.getItem('docex_table_config_list');
+        let loadedTableList = [];
+        if (cachedTableList) {
+          try { loadedTableList = JSON.parse(cachedTableList); } catch { }
+        }
 
-    const cachedTableList = localStorage.getItem('docex_table_config_list');
-    let loadedTableList = [];
-    if (cachedTableList) {
-      try {
-        loadedTableList = JSON.parse(cachedTableList);
-      } catch { }
-    }
+        const hasWpsDefault = loadedTableList.some(c => c.id === 'wps_test');
+        const hasFeishuDefault = loadedTableList.some(c => c.id === 'feishu_test');
 
-    const hasWpsDefault = loadedTableList.some(c => c.id === 'wps_test');
-    const hasFeishuDefault = loadedTableList.some(c => c.id === 'feishu_test');
+        if (!hasWpsDefault) loadedTableList.push(defaultWpsConf);
+        if (!hasFeishuDefault) loadedTableList.push(defaultFeishuConf);
 
-    if (!hasWpsDefault) loadedTableList.push(defaultWpsConf);
-    if (!hasFeishuDefault) loadedTableList.push(defaultFeishuConf);
+        loadedTableList = loadedTableList.map(c => {
+          if (c.id === 'wps_test') return { ...defaultWpsConf, url: c.url || defaultWpsConf.url };
+          if (c.id === 'feishu_test') return { ...defaultFeishuConf, url: c.url || defaultFeishuConf.url };
+          return c;
+        });
 
-    loadedTableList = loadedTableList.map(c => {
-      if (c.id === 'wps_test') return { ...defaultWpsConf, url: c.url || defaultWpsConf.url };
-      if (c.id === 'feishu_test') return { ...defaultFeishuConf, url: c.url || defaultFeishuConf.url };
-      return c;
-    });
+        setTableConfigList(loadedTableList);
 
-    setTableConfigList(loadedTableList);
+        const activeTableId = localStorage.getItem('docex_active_table_config_id') || 'wps_test';
+        const activeTableConfig = loadedTableList.find(c => c.id === activeTableId) || defaultWpsConf;
 
-    const activeTableId = localStorage.getItem('docex_active_table_config_id') || 'wps_test';
-    const activeTableConfig = loadedTableList.find(c => c.id === activeTableId) || defaultWpsConf;
+        setPlatform(activeTableConfig.platform || 'wps');
+        
+        const savedWpsUrl = localStorage.getItem('docex_wps_url');
+        const savedFeishuUrl = localStorage.getItem('docex_feishu_url');
 
-    setPlatform(activeTableConfig.platform || 'wps');
-    if (activeTableConfig.platform === 'wps') {
-      setWpsUrl(activeTableConfig.url || '');
-    } else {
-      setFeishuUrl(activeTableConfig.url || '');
-    }
-    setTableAppId(activeTableConfig.appId || '');
-    setTableAppSecret(activeTableConfig.appSecret || '');
-    setSelectedTableConfigId(activeTableConfig.id);
-    setCustomTableConfigName(activeTableConfig.isDefault ? '' : activeTableConfig.name);
+        const resolvedWpsUrl = savedWpsUrl || defaultWpsConf?.url || '';
+        const resolvedFeishuUrl = savedFeishuUrl || defaultFeishuConf?.url || '';
+
+        setWpsUrl(resolvedWpsUrl);
+        setFeishuUrl(resolvedFeishuUrl);
+
+        setTableAppId(activeTableConfig.appId || '');
+        setTableAppSecret(activeTableConfig.appSecret || '');
+        setSelectedTableConfigId(activeTableConfig.id);
+        setCustomTableConfigName(activeTableConfig.isDefault ? '' : activeTableConfig.name);
+      })
+      .catch(err => {
+        console.error('加载外部 config.json 失败:', err);
+      });
 
     fetchHistoryFiles();
 
@@ -673,17 +658,17 @@ export default function DocumentExtractor({ presetId = null }) {
     localStorage.setItem('docex_llm_config_list', JSON.stringify(updatedList));
 
     setSelectedConfigId('default');
-    const defaultConf = updatedList.find(c => c.id === 'default');
-    if (defaultConf) {
+    const defaultLLMConf = updatedList.find(c => c.id === 'default');
+    if (defaultLLMConf) {
       setLlmConfig({
-        provider: defaultConf.provider,
-        baseUrl: defaultConf.baseUrl,
-        model: defaultConf.model,
-        apiKey: defaultConf.apiKey
+        provider: defaultLLMConf.provider,
+        baseUrl: defaultLLMConf.baseUrl,
+        model: defaultLLMConf.model,
+        apiKey: defaultLLMConf.apiKey
       });
       setCustomConfigName('');
       localStorage.setItem('docex_active_llm_config_id', 'default');
-      localStorage.setItem('docex_llm_config', JSON.stringify(defaultConf));
+      localStorage.setItem('docex_llm_config', JSON.stringify(defaultLLMConf));
     }
     showToast('🗑️ 配置删除成功，已恢复为默认配置');
   };

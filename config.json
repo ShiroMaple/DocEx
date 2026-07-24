@@ -1,0 +1,29 @@
+{
+  "defaultLLMConf": {
+    "id": "default",
+    "name": "默认配置",
+    "provider": "XiaoMi",
+    "baseUrl": "https://token-plan-cn.xiaomimimo.com/v1",
+    "model": "mimo-v2.5",
+    "apiKey": "",
+    "isDefault": true
+  },
+  "defaultWpsConf": {
+    "id": "wps_test",
+    "name": "WPS测试配置",
+    "platform": "wps",
+    "appId": "AK20260709WHJKYS",
+    "appSecret": "[REDACTED_WPS_APP_SECRET]",
+    "url": "https://365.kdocs.cn/l/cbGbLglUXASe",
+    "isDefault": true
+  },
+  "defaultFeishuConf": {
+    "id": "feishu_test",
+    "name": "飞书测试配置",
+    "platform": "feishu",
+    "appId": "[REDACTED_FEISHU_APP_ID]",
+    "appSecret": "[REDACTED_LARK_APP_SECRET]",
+    "url": "https://cli-aac44e92a2b89bd5.feishu.cn/base/[REDACTED_FEISHU_APP_TOKEN]?table=[REDACTED_FEISHU_TABLE_ID]",
+    "isDefault": true
+  }
+}

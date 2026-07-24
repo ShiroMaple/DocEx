@@ -75,7 +75,7 @@ export function getResolvedPreset(id) {
     baseId: process.env[`${prefix}_WPS_BASE_ID`] || process.env.WPS_BASE_ID || config.wps.baseId || ''
   };
 
-  const platform = process.env[`${prefix}_TABLE_PLATFORM`] || (lark.appToken && lark.tableId ? 'feishu' : 'wps');
+  const platform = process.env[`${prefix}_TABLE_PLATFORM`] || rawPreset.platform || (lark.appToken && lark.tableId ? 'feishu' : 'wps');
 
   return {
     ...rawPreset,
