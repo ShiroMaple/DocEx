@@ -167,6 +167,9 @@ export default function DocumentExtractor({ presetId = null }) {
             }
           }
 
+          const activeTableId = p.tableConfigId || p.tableConfig?.id || (p.platform === 'feishu' ? 'feishu_test' : 'wps_test');
+          setSelectedTableConfigId(activeTableId);
+
           if (p.platform === 'feishu') {
             const token = p.lark?.appToken || p.tableConfig?.appToken || '';
             const tid = p.lark?.tableId || p.tableConfig?.tableId || '';

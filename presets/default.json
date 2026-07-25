@@ -5,6 +5,7 @@
   "subtitle": "自定义提取字段与提示词",
   "badgeText": "智能结构化提取文档数据",
   "icon": "🌐",
+  "tableConfigId": "wps_test",
   "locked": false,
   "allowCustomModel": true,
   "allowCustomPlatform": true,
