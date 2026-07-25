@@ -258,44 +258,48 @@ export default function DocumentExtractor({ presetId = null }) {
         setCustomConfigName(activeConfig.isDefault ? '' : activeConfig.name);
 
         // 2. Load Table Configurations
+        const serverTableConfigs = configData.parsedTableConfigs || [];
         const cachedTableList = localStorage.getItem('docex_table_config_list');
         let loadedTableList = [];
         if (cachedTableList) {
           try { loadedTableList = JSON.parse(cachedTableList); } catch { }
         }
 
-        const hasWpsDefault = loadedTableList.some(c => c.id === 'wps_test');
-        const hasFeishuDefault = loadedTableList.some(c => c.id === 'feishu_test');
-
-        if (!hasWpsDefault) loadedTableList.push(defaultWpsConf);
-        if (!hasFeishuDefault) loadedTableList.push(defaultFeishuConf);
-
-        loadedTableList = loadedTableList.map(c => {
-          if (c.id === 'wps_test') return { ...defaultWpsConf, url: c.url || defaultWpsConf.url };
-          if (c.id === 'feishu_test') return { ...defaultFeishuConf, url: c.url || defaultFeishuConf.url };
-          return c;
+        // Merge server-defined configs from config.json into loadedTableList
+        serverTableConfigs.forEach(stc => {
+          const idx = loadedTableList.findIndex(c => c.id === stc.id);
+          if (idx < 0) {
+            loadedTableList.push(stc);
+          } else {
+            loadedTableList[idx] = { ...stc, url: loadedTableList[idx].url || stc.url };
+          }
         });
+
+        if (!loadedTableList.some(c => c.id === 'wps_test')) loadedTableList.push(defaultWpsConf);
+        if (!loadedTableList.some(c => c.id === 'feishu_test')) loadedTableList.push(defaultFeishuConf);
 
         setTableConfigList(loadedTableList);
 
-        const activeTableId = localStorage.getItem('docex_active_table_config_id') || 'wps_test';
-        const activeTableConfig = loadedTableList.find(c => c.id === activeTableId) || defaultWpsConf;
+        if (!presetId) {
+          const activeTableId = localStorage.getItem('docex_active_table_config_id') || 'wps_test';
+          const activeTableConfig = loadedTableList.find(c => c.id === activeTableId) || defaultWpsConf;
 
-        setPlatform(activeTableConfig.platform || 'wps');
-        
-        const savedWpsUrl = localStorage.getItem('docex_wps_url');
-        const savedFeishuUrl = localStorage.getItem('docex_feishu_url');
+          setPlatform(activeTableConfig.platform || 'wps');
+          
+          const savedWpsUrl = localStorage.getItem('docex_wps_url');
+          const savedFeishuUrl = localStorage.getItem('docex_feishu_url');
 
-        const resolvedWpsUrl = savedWpsUrl || defaultWpsConf?.url || '';
-        const resolvedFeishuUrl = savedFeishuUrl || defaultFeishuConf?.url || '';
+          const resolvedWpsUrl = savedWpsUrl || defaultWpsConf?.url || '';
+          const resolvedFeishuUrl = savedFeishuUrl || defaultFeishuConf?.url || '';
 
-        setWpsUrl(resolvedWpsUrl);
-        setFeishuUrl(resolvedFeishuUrl);
+          setWpsUrl(resolvedWpsUrl);
+          setFeishuUrl(resolvedFeishuUrl);
 
-        setTableAppId(activeTableConfig.appId || '');
-        setTableAppSecret(activeTableConfig.appSecret || '');
-        setSelectedTableConfigId(activeTableConfig.id);
-        setCustomTableConfigName(activeTableConfig.isDefault ? '' : activeTableConfig.name);
+          setTableAppId(activeTableConfig.appId || '');
+          setTableAppSecret(activeTableConfig.appSecret || '');
+          setSelectedTableConfigId(activeTableConfig.id);
+          setCustomTableConfigName(activeTableConfig.isDefault ? '' : activeTableConfig.name);
+        }
       })
       .catch(err => {
         console.error('加载外部 config.json 失败:', err);
