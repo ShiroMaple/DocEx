@@ -53,29 +53,52 @@ export function getResolvedPreset(id) {
 
   const prefix = targetId.toUpperCase();
 
-  // 读取与合并大模型 API 凭证 (格式如 HSE_OPENAI_API_KEY，无配置则自动回退至通用 OPENAI_API_KEY)
-  const provider = process.env[`${prefix}_LLM_PROVIDER`] || process.env.LLM_PROVIDER || config.llmProvider || 'openai';
+  // 读取与合并大模型 API 凭证 (格式如 HSE_OPENAI_API_KEY，无配置则自动回退至通用凭证)
+  const provider = config.getEnv(`${prefix}_LLM_PROVIDER`, config.llmProvider || 'openai');
   const openai = {
-    apiKey: process.env[`${prefix}_OPENAI_API_KEY`] || process.env.OPENAI_API_KEY || config.openai.apiKey || '',
-    baseUrl: process.env[`${prefix}_OPENAI_BASE_URL`] || process.env.OPENAI_BASE_URL || config.openai.baseUrl || 'https://api.openai.com/v1',
-    model: process.env[`${prefix}_OPENAI_MODEL`] || process.env.OPENAI_MODEL || config.openai.model || 'gpt-4o-mini'
+    apiKey: config.getEnv(`${prefix}_OPENAI_API_KEY`, config.openai.apiKey || ''),
+    baseUrl: config.getEnv(`${prefix}_OPENAI_BASE_URL`, config.openai.baseUrl || 'https://api.openai.com/v1'),
+    model: config.getEnv(`${prefix}_OPENAI_MODEL`, config.openai.model || 'gpt-4o-mini')
   };
 
-  // 读取与合并多维表格凭证 (格式如 HSE_LARK_APP_TOKEN，无配置则自动回退至通用 LARK_APP_TOKEN)
+  // 优先按 rawPreset.tableConfigId (如 wps_hse) 查找 config.json 中的表格配置
+  const targetTableConfigId = rawPreset.tableConfigId || '';
+  const matchedTableConfig = (config.parsedTableConfigs || []).find(c => 
+    (targetTableConfigId && c.id === targetTableConfigId) || 
+    c.id === `wps_${targetId}` || 
+    c.id === `feishu_${targetId}` || 
+    c.id === `${targetId}_table`
+  ) || (rawPreset.platform === 'feishu' ? config.defaultFeishuConf : config.defaultWpsConf);
+
+  let fallbackWpsTableId = matchedTableConfig?.tableId || '';
+  if (!fallbackWpsTableId && matchedTableConfig?.url) {
+    const urlMatch = matchedTableConfig.url.match(/\/l\/([^?#/]+)/);
+    fallbackWpsTableId = urlMatch ? urlMatch[1] : '';
+  }
+  if (!fallbackWpsTableId && config.defaultWpsConf?.url) {
+    const urlMatch = config.defaultWpsConf.url.match(/\/l\/([^?#/]+)/);
+    fallbackWpsTableId = urlMatch ? urlMatch[1] : '';
+  }
+
+  // 读取与合并多维表格凭证 (统一使用 tableId 命名)
   const lark = {
-    appId: process.env[`${prefix}_LARK_APP_ID`] || process.env.LARK_APP_ID || config.lark.appId || '',
-    appSecret: process.env[`${prefix}_LARK_APP_SECRET`] || process.env.LARK_APP_SECRET || config.lark.appSecret || '',
-    appToken: process.env[`${prefix}_LARK_APP_TOKEN`] || process.env.LARK_APP_TOKEN || config.lark.appToken || '',
-    tableId: process.env[`${prefix}_LARK_TABLE_ID`] || process.env.LARK_TABLE_ID || config.lark.tableId || ''
+    appId: config.getEnv(`${prefix}_LARK_APP_ID`, matchedTableConfig?.appId || config.lark.appId || ''),
+    appSecret: config.getEnv(`${prefix}_LARK_APP_SECRET`, matchedTableConfig?.appSecret || config.lark.appSecret || ''),
+    appToken: config.getEnv(`${prefix}_LARK_APP_TOKEN`, matchedTableConfig?.appToken || config.lark.appToken || ''),
+    tableId: config.getEnv(`${prefix}_LARK_TABLE_ID`, matchedTableConfig?.tableId || config.lark.tableId || ''),
+    url: matchedTableConfig?.platform === 'feishu' ? matchedTableConfig.url : ''
   };
+
+  const wpsTableId = config.getEnv(`${prefix}_WPS_TABLE_ID`, config.getEnv(`${prefix}_WPS_BASE_ID`, fallbackWpsTableId));
 
   const wps = {
-    appId: process.env[`${prefix}_WPS_APP_ID`] || process.env.WPS_APP_ID || config.wps.appId || '',
-    appSecret: process.env[`${prefix}_WPS_APP_SECRET`] || process.env.WPS_APP_SECRET || config.wps.appSecret || '',
-    baseId: process.env[`${prefix}_WPS_BASE_ID`] || process.env.WPS_BASE_ID || config.wps.baseId || ''
+    appId: config.getEnv(`${prefix}_WPS_APP_ID`, matchedTableConfig?.appId || config.wps.appId || ''),
+    appSecret: config.getEnv(`${prefix}_WPS_APP_SECRET`, matchedTableConfig?.appSecret || config.wps.appSecret || ''),
+    tableId: wpsTableId,
+    url: matchedTableConfig?.platform === 'wps' ? matchedTableConfig.url : (wpsTableId ? `https://365.kdocs.cn/l/${wpsTableId}` : '')
   };
 
-  const platform = process.env[`${prefix}_TABLE_PLATFORM`] || rawPreset.platform || (lark.appToken && lark.tableId ? 'feishu' : 'wps');
+  const platform = config.getEnv(`${prefix}_TABLE_PLATFORM`, rawPreset.platform || matchedTableConfig?.platform || (lark.appToken && lark.tableId ? 'feishu' : 'wps'));
 
   return {
     ...rawPreset,
@@ -134,6 +157,7 @@ export function getSafePresetForClient(id) {
     subtitle: resolved.subtitle,
     badgeText: resolved.badgeText,
     icon: resolved.icon || (resolved.id === 'default' ? '🌐' : '⚙️'),
+    tableConfigId: resolved.tableConfigId || '',
     locked: resolved.locked,
     allowCustomModel: resolved.allowCustomModel,
     allowCustomPlatform: resolved.allowCustomPlatform,
@@ -150,10 +174,14 @@ export function getSafePresetForClient(id) {
       model: resolved.openai.model,
       hasApiKey: Boolean(resolved.openai.apiKey)
     },
+    wps: resolved.wps,
+    lark: resolved.lark,
     tableConfig: {
       platform: resolved.platform,
+      url: resolved.platform === 'wps' ? resolved.wps.url : resolved.lark.url,
+      tableId: resolved.platform === 'wps' ? resolved.wps.tableId : resolved.lark.tableId,
       hasLarkConfig: Boolean(resolved.lark.appToken && resolved.lark.tableId),
-      hasWpsConfig: Boolean(resolved.wps.baseId)
+      hasWpsConfig: Boolean(resolved.wps.tableId)
     }
   };
 }

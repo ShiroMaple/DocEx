@@ -6,12 +6,14 @@ import 'pino-roll';
 import 'pino-pretty';
 
 
+import { config } from '../config/index.js';
+
 export const als = new AsyncLocalStorage();
 
-const isProd = process.env.NODE_ENV === 'production';
+const isProd = config.system.nodeEnv === 'production';
 
 export const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
+  level: config.system.logLevel || 'info',
   // 🔒 Redaction: Safe masking of sensitive and large data fields
   redact: {
     paths: [

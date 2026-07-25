@@ -17,7 +17,7 @@ class WpsService {
   constructor() {
     this.appId = config.wps?.appId;
     this.appSecret = config.wps?.appSecret;
-    this.fileId = config.wps?.baseId;
+    this.fileId = config.wps?.tableId || config.wps?.baseId;
     this._tokenCache = null; // { token, expireTime, appId }
     this._schemaCache = null;
     this._schemaCacheTime = 0;

@@ -1,3 +1,5 @@
+import { config } from '../config/index.js';
+
 // In-memory rate limiter for default LLM key
 const ipRequestLogs = {};
 
@@ -5,32 +7,35 @@ const ipRequestLogs = {};
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
     const now = Date.now();
+    const windowMs = config.rateLimit.windowMs;
     for (const ip of Object.keys(ipRequestLogs)) {
-      ipRequestLogs[ip] = ipRequestLogs[ip].filter(timestamp => now - timestamp < 60000);
+      ipRequestLogs[ip] = ipRequestLogs[ip].filter(timestamp => now - timestamp < windowMs);
       if (ipRequestLogs[ip].length === 0) {
         delete ipRequestLogs[ip];
       }
     }
-  }, 60000);
+  }, config.rateLimit.windowMs);
 }
 
 /**
- * 校验默认 AI 配置的使用频次限制（每个 IP 限制为 5 次 / 分钟）
+ * 校验默认 AI 配置的使用频次限制
  * @param {string} ip - 客户端 IP
  * @returns {boolean} 是否允许访问
  */
 export function checkRateLimit(ip) {
   const now = Date.now();
   const cleanIp = ip ? ip.split(',')[0].trim() : '127.0.0.1';
+  const windowMs = config.rateLimit.windowMs;
+  const maxRequests = config.rateLimit.maxRequests;
   
   if (!ipRequestLogs[cleanIp]) {
     ipRequestLogs[cleanIp] = [];
   }
   
-  // 仅保留过去 60 秒内的请求时间戳
-  ipRequestLogs[cleanIp] = ipRequestLogs[cleanIp].filter(timestamp => now - timestamp < 60000);
+  // 仅保留过去的窗口时间内的请求时间戳
+  ipRequestLogs[cleanIp] = ipRequestLogs[cleanIp].filter(timestamp => now - timestamp < windowMs);
   
-  if (ipRequestLogs[cleanIp].length >= 5) {
+  if (ipRequestLogs[cleanIp].length >= maxRequests) {
     return false; // 触发限流
   }
   

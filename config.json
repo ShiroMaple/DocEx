@@ -1,29 +1,61 @@
 {
-  "defaultLLMConf": {
-    "id": "default",
-    "name": "默认配置",
-    "provider": "XiaoMi",
-    "baseUrl": "https://token-plan-cn.xiaomimimo.com/v1",
-    "model": "mimo-v2.5",
-    "apiKey": "",
-    "isDefault": true
+  "system": {
+    "nodeEnv": "development",
+    "logLevel": "info"
   },
-  "defaultWpsConf": {
-    "id": "wps_test",
-    "name": "WPS测试配置",
-    "platform": "wps",
-    "appId": "AK20260709WHJKYS",
-    "appSecret": "[REDACTED_WPS_APP_SECRET]",
-    "url": "https://365.kdocs.cn/l/cbGbLglUXASe",
-    "isDefault": true
+  "rateLimit": {
+    "windowMs": 60000,
+    "maxRequests": 5
   },
-  "defaultFeishuConf": {
-    "id": "feishu_test",
-    "name": "飞书测试配置",
-    "platform": "feishu",
-    "appId": "[REDACTED_FEISHU_APP_ID]",
-    "appSecret": "[REDACTED_LARK_APP_SECRET]",
-    "url": "https://cli-aac44e92a2b89bd5.feishu.cn/base/[REDACTED_FEISHU_APP_TOKEN]?table=[REDACTED_FEISHU_TABLE_ID]",
-    "isDefault": true
+  "paths": {
+    "inputDir": "data/input",
+    "outputDir": "data/output",
+    "uploadDir": "data/uploads",
+    "preprocessDir": "data/preprocessed",
+    "presetsDir": "presets"
+  },
+  "llm": {
+    "timeoutMs": 60000,
+    "maxRetries": 2,
+    "configs": [
+      {
+        "id": "default",
+        "name": "默认配置",
+        "provider": "XiaoMi",
+        "baseUrl": "https://token-plan-cn.xiaomimimo.com/v1",
+        "model": "mimo-v2.5",
+        "isDefault": true
+      }
+    ]
+  },
+  "tables": {
+    "configs": [
+      {
+        "id": "wps_test",
+        "name": "WPS测试配置",
+        "platform": "wps",
+        "baseUrl": "https://365.kdocs.cn/l/",
+        "tableId": "cbGbLglUXASe",
+        "isDefault": true
+      },
+      {
+        "id": "feishu_test",
+        "name": "飞书测试配置",
+        "platform": "feishu",
+        "baseUrl": "https://cli-aac44e92a2b89bd5.feishu.cn/base/",
+        "appToken": "[REDACTED_FEISHU_APP_TOKEN]",
+        "tableId": "[REDACTED_FEISHU_TABLE_ID]",
+        "isDefault": true
+      },
+      {
+        "id": "wps_hse",
+        "name": "安全环保部_WPS归档表",
+        "platform": "wps",
+        "baseUrl": "https://365.kdocs.cn/l/",
+        "tableId": "caa23eb4LQBg",
+        "appIdEnv": "HSE_WPS_APP_ID",
+        "appSecretEnv": "HSE_WPS_APP_SECRET"
+      }
+    ]
   }
 }

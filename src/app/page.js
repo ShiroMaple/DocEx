@@ -167,15 +167,47 @@ export default function DocumentExtractor({ presetId = null }) {
             }
           }
 
-          if (p.platform === 'feishu' && p.lark) {
-            setFeishuAppToken(p.lark.appToken || '');
-            setFeishuTableId(p.lark.tableId || '');
-            setTableAppId(p.lark.appId || '');
-            setTableAppSecret(p.lark.appSecret || '');
-          } else if (p.platform === 'wps' && p.wps) {
-            setWpsFileId(p.wps.baseId || '');
-            setTableAppId(p.wps.appId || '');
-            setTableAppSecret(p.wps.appSecret || '');
+          if (p.platform === 'feishu') {
+            const token = p.lark?.appToken || p.tableConfig?.appToken || '';
+            const tid = p.lark?.tableId || p.tableConfig?.tableId || '';
+            const appId = p.lark?.appId || '';
+            const appSecret = p.lark?.appSecret || '';
+            setFeishuAppToken(token);
+            setFeishuTableId(tid);
+            setTableAppId(appId);
+            setTableAppSecret(appSecret);
+            const url = p.tableConfig?.url || (token ? `https://cli-aac44e92a2b89bd5.feishu.cn/base/${token}?table=${tid}` : '');
+            setFeishuUrl(url);
+
+            verifyTableConnection({
+              platform: 'feishu',
+              feishuAppToken: token,
+              feishuTableId: tid,
+              feishuUrl: url,
+              appId,
+              appSecret,
+              fields: p.fields || [],
+              fieldMapping: p.fieldMapping
+            });
+          } else if (p.platform === 'wps') {
+            const fid = p.wps?.tableId || p.wps?.baseId || p.tableConfig?.tableId || '';
+            const appId = p.wps?.appId || '';
+            const appSecret = p.wps?.appSecret || '';
+            setWpsFileId(fid);
+            setTableAppId(appId);
+            setTableAppSecret(appSecret);
+            const url = p.tableConfig?.url || (fid ? `https://365.kdocs.cn/l/${fid}` : '');
+            setWpsUrl(url);
+
+            verifyTableConnection({
+              platform: 'wps',
+              wpsFileId: fid,
+              wpsUrl: url,
+              appId,
+              appSecret,
+              fields: p.fields || [],
+              fieldMapping: p.fieldMapping
+            });
           }
         }
       })
@@ -347,33 +379,62 @@ export default function DocumentExtractor({ presetId = null }) {
   };
 
   // ── Sync spreadsheet schema ──
-  const verifyTableConnection = async () => {
+  const verifyTableConnection = async (overrideParams = null) => {
     setIsConnectingTable(true);
     setIsSchemaLoading(true);
     setTableConnectionError('');
     setIsTableConnected(false);
 
-    let query = `provider=${platform}&force=true`;
-    if (platform === 'wps') {
-      if (!wpsFileId) {
-        setTableConnectionError('WPS File ID 不能为空');
+    const activePlatform = overrideParams?.platform || platform;
+    const activeAppId = overrideParams?.appId || tableAppId;
+    const activeAppSecret = overrideParams?.appSecret || tableAppSecret;
+
+    let query = `provider=${activePlatform}&force=true`;
+
+    if (activePlatform === 'wps') {
+      let targetFileId = overrideParams?.wpsFileId || wpsFileId;
+      const targetUrl = overrideParams?.wpsUrl || wpsUrl;
+
+      if (!targetFileId && targetUrl) {
+        const match = targetUrl.match(/\/l\/([^?#/]+)/);
+        targetFileId = match ? match[1] : targetUrl.trim();
+      }
+
+      if (!targetFileId) {
+        setTableConnectionError('请先输入有效的 WPS 协作分享链接');
         setIsConnectingTable(false);
         setIsSchemaLoading(false);
-        return;
+        return false;
       }
-      query += `&fileId=${wpsFileId}`;
+      query += `&fileId=${encodeURIComponent(targetFileId)}`;
     } else {
-      if (!feishuAppToken || !feishuTableId) {
-        setTableConnectionError('飞书 AppToken 或 TableID 不能为空');
+      let targetAppToken = overrideParams?.feishuAppToken || feishuAppToken;
+      let targetTableId = overrideParams?.feishuTableId || feishuTableId;
+      const targetUrl = overrideParams?.feishuUrl || feishuUrl;
+
+      if ((!targetAppToken || !targetTableId) && targetUrl) {
+        const tokenMatch = targetUrl.match(/\/(base|wiki)\/([a-zA-Z0-9_-]+)/);
+        if (tokenMatch) targetAppToken = tokenMatch[2];
+        try {
+          const urlObj = new URL(targetUrl);
+          targetTableId = urlObj.searchParams.get('table') || '';
+        } catch (e) {
+          const tableMatch = targetUrl.match(/[?&]table=([a-zA-Z0-9]+)/);
+          if (tableMatch) targetTableId = tableMatch[1];
+        }
+      }
+
+      if (!targetAppToken || !targetTableId) {
+        setTableConnectionError('请先输入有效的飞书多维表格链接（包含 table 参数）');
         setIsConnectingTable(false);
         setIsSchemaLoading(false);
-        return;
+        return false;
       }
-      query += `&appToken=${feishuAppToken}&tableId=${feishuTableId}`;
+      query += `&appToken=${encodeURIComponent(targetAppToken)}&tableId=${encodeURIComponent(targetTableId)}`;
     }
 
-    if (tableAppId) query += `&appId=${encodeURIComponent(tableAppId)}`;
-    if (tableAppSecret) query += `&appSecret=${encodeURIComponent(tableAppSecret)}`;
+    if (activeAppId) query += `&appId=${encodeURIComponent(activeAppId)}`;
+    if (activeAppSecret) query += `&appSecret=${encodeURIComponent(activeAppSecret)}`;
 
     try {
       const res = await fetch(`/api/schema?${query}`);
@@ -385,76 +446,38 @@ export default function DocumentExtractor({ presetId = null }) {
       setTableName(data.sheetName || '数据表');
       setIsTableConnected(true);
 
+      const fieldsToUse = overrideParams?.fields || fields;
       const initMappings = {};
-      fields.forEach(f => {
+      fieldsToUse.forEach(f => {
         const match = fuzzyMatchField(f.label, data.fields);
         if (match) {
           initMappings[match] = f.key;
         }
       });
 
-      const targetId = platform === 'wps' ? wpsFileId : `${feishuAppToken}_${feishuTableId}`;
-      const saved = localStorage.getItem(`docex_mapping_${targetId}`);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          Object.keys(parsed).forEach(col => {
-            const schemaField = data.fields.find(sf => sf.name === col);
-            if (schemaField && !schemaField.isReadOnly) {
-              initMappings[col] = parsed[col];
-            }
-          });
-        } catch { }
+      if (overrideParams?.fieldMapping) {
+        Object.assign(initMappings, overrideParams.fieldMapping);
+      } else {
+        const targetId = activePlatform === 'wps' ? (overrideParams?.wpsFileId || wpsFileId) : `${overrideParams?.feishuAppToken || feishuAppToken}_${overrideParams?.feishuTableId || feishuTableId}`;
+        const saved = localStorage.getItem(`docex_mapping_${targetId}`);
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            Object.keys(parsed).forEach(col => {
+              const schemaField = data.fields.find(sf => sf.name === col);
+              if (schemaField && !schemaField.isReadOnly) {
+                initMappings[col] = parsed[col];
+              }
+            });
+          } catch { }
+        }
       }
 
       setFieldMappings(initMappings);
-
-      let updatedList = [...tableConfigList];
-      let savedId = selectedTableConfigId;
-      const currentUrl = platform === 'wps' ? wpsUrl : feishuUrl;
-
-      if (selectedTableConfigId === 'new') {
-        let nameToUse = customTableConfigName.trim();
-        if (!nameToUse) {
-          const customConfigs = tableConfigList.filter(c => !c.isDefault);
-          nameToUse = `自定义表格配置 ${customConfigs.length + 1}`;
-        }
-        const newId = `table_${Date.now()}`;
-        const newConfig = {
-          id: newId,
-          name: nameToUse,
-          platform,
-          appId: tableAppId,
-          appSecret: tableAppSecret,
-          url: currentUrl,
-          isDefault: false
-        };
-        updatedList = [...tableConfigList, newConfig];
-        savedId = newId;
-        setSelectedTableConfigId(newId);
-        setCustomTableConfigName(nameToUse);
-      } else {
-        updatedList = tableConfigList.map(c => {
-          if (c.id === selectedTableConfigId) {
-            return {
-              ...c,
-              platform,
-              appId: tableAppId,
-              appSecret: tableAppSecret,
-              url: currentUrl,
-              name: c.isDefault ? c.name : (customTableConfigName.trim() || c.name)
-            };
-          }
-          return c;
-        });
-      }
-
-      setTableConfigList(updatedList);
-      localStorage.setItem('docex_table_config_list', JSON.stringify(updatedList));
-      localStorage.setItem('docex_active_table_config_id', savedId);
-
+      return true;
     } catch (err) {
       setTableConnectionError(err.message);
+      return false;
     } finally {
       setIsConnectingTable(false);
       setIsSchemaLoading(false);
@@ -935,8 +958,15 @@ export default function DocumentExtractor({ presetId = null }) {
       return;
     }
     if (!isTableConnected) {
-      alert('请先点击顶部状态栏的【📊 多维表格】同步并验证云端列头！');
-      return;
+      const autoOk = await verifyTableConnection();
+      if (!autoOk) {
+        if (preset?.locked || preset?.allowCustomPlatform === false) {
+          showToast('⚠️ 预设多维表格连通验证失败，请检查配置文件或网络情况');
+        } else {
+          alert('请先点击顶部状态栏的【📊 多维表格】同步并验证云端列头！');
+        }
+        return;
+      }
     }
 
     setExtractionError('');
