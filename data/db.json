@@ -118,6 +118,134 @@
       "error": null,
       "textPath": "data/preprocessed/ba484dd8b492518909e9087129db8b20/text.txt",
       "structurePath": "data/preprocessed/ba484dd8b492518909e9087129db8b20/structure.json"
+    },
+    {
+      "md5": "fcccfa7a4d6f70f2b9d8e0d3ac405fbb",
+      "fileName": "王启印体检报告.pdf",
+      "uploadTime": "2026-07-27T01:48:28.725Z",
+      "status": "done",
+      "progress": 100,
+      "originalPath": "C:\\Users\\gaoft\\Documents\\CodeSpace\\docex\\data\\uploads\\fcccfa7a4d6f70f2b9d8e0d3ac405fbb.pdf",
+      "error": null,
+      "textPath": "data/preprocessed/fcccfa7a4d6f70f2b9d8e0d3ac405fbb/text.txt",
+      "images": [
+        {
+          "path": "data/preprocessed/fcccfa7a4d6f70f2b9d8e0d3ac405fbb/page-1.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/fcccfa7a4d6f70f2b9d8e0d3ac405fbb/page-2.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/fcccfa7a4d6f70f2b9d8e0d3ac405fbb/page-3.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/fcccfa7a4d6f70f2b9d8e0d3ac405fbb/page-4.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/fcccfa7a4d6f70f2b9d8e0d3ac405fbb/page-5.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/fcccfa7a4d6f70f2b9d8e0d3ac405fbb/page-6.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/fcccfa7a4d6f70f2b9d8e0d3ac405fbb/page-7.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/fcccfa7a4d6f70f2b9d8e0d3ac405fbb/page-8.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/fcccfa7a4d6f70f2b9d8e0d3ac405fbb/page-9.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/fcccfa7a4d6f70f2b9d8e0d3ac405fbb/page-10.png",
+          "mimeType": "image/png"
+        }
+      ]
+    },
+    {
+      "md5": "4fd3a4343fca1a93be64ab7ffb86047e",
+      "fileName": "董少朋体检表.pdf",
+      "uploadTime": "2026-07-27T01:49:32.125Z",
+      "status": "done",
+      "progress": 100,
+      "originalPath": "C:\\Users\\gaoft\\Documents\\CodeSpace\\docex\\data\\uploads\\4fd3a4343fca1a93be64ab7ffb86047e.pdf",
+      "error": null,
+      "textPath": "data/preprocessed/4fd3a4343fca1a93be64ab7ffb86047e/text.txt",
+      "images": [
+        {
+          "path": "data/preprocessed/4fd3a4343fca1a93be64ab7ffb86047e/page-1.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/4fd3a4343fca1a93be64ab7ffb86047e/page-2.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/4fd3a4343fca1a93be64ab7ffb86047e/page-3.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/4fd3a4343fca1a93be64ab7ffb86047e/page-4.png",
+          "mimeType": "image/png"
+        }
+      ]
+    },
+    {
+      "md5": "381a6e7caaad94476318c527620fe226",
+      "fileName": "赵丹-体检报告.pdf",
+      "uploadTime": "2026-07-27T01:49:38.723Z",
+      "status": "done",
+      "progress": 100,
+      "originalPath": "C:\\Users\\gaoft\\Documents\\CodeSpace\\docex\\data\\uploads\\381a6e7caaad94476318c527620fe226.pdf",
+      "error": null,
+      "textPath": "data/preprocessed/381a6e7caaad94476318c527620fe226/text.txt",
+      "images": [
+        {
+          "path": "data/preprocessed/381a6e7caaad94476318c527620fe226/page-1.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/381a6e7caaad94476318c527620fe226/page-2.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/381a6e7caaad94476318c527620fe226/page-3.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/381a6e7caaad94476318c527620fe226/page-4.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/381a6e7caaad94476318c527620fe226/page-5.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/381a6e7caaad94476318c527620fe226/page-6.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/381a6e7caaad94476318c527620fe226/page-7.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/381a6e7caaad94476318c527620fe226/page-8.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/381a6e7caaad94476318c527620fe226/page-9.png",
+          "mimeType": "image/png"
+        }
+      ]
     }
   ]
 }

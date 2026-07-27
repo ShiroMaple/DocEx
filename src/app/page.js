@@ -285,7 +285,7 @@ export default function DocumentExtractor({ presetId = null }) {
           const activeTableConfig = loadedTableList.find(c => c.id === activeTableId) || defaultWpsConf;
 
           setPlatform(activeTableConfig.platform || 'wps');
-          
+
           const savedWpsUrl = localStorage.getItem('docex_wps_url');
           const savedFeishuUrl = localStorage.getItem('docex_feishu_url');
 
@@ -1503,7 +1503,7 @@ export default function DocumentExtractor({ presetId = null }) {
                 <span>
                   {preset
                     ? (preset.badgeText || preset.subtitle || preset.name)
-                    : (allPresetsList.find(p => p.id === 'default')?.badgeText || '智能结构化提取文档数据')}
+                    : (allPresetsList.find(p => p.id === 'default')?.badgeText || '智能结构化文档数据提取')}
                 </span>
                 <ChevronDown size={12} className={`text-stone-gray transition-transform duration-200 ${activePopover === 'version' ? 'rotate-180' : ''}`} />
               </button>

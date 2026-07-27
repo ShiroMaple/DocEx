@@ -16,6 +16,7 @@ data/uploads/
 data/preprocessed/
 
 # Other input/output directories
+data/db.json
 data/output/*
 !data/output/.gitkeep
 data/input/*
