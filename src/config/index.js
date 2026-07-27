@@ -69,7 +69,7 @@ const lark = {
 const wps = {
   appId: process.env.WPS_APP_ID || '',
   appSecret: process.env.WPS_APP_SECRET || '',
-  tableId: process.env.WPS_TABLE_ID || process.env.WPS_BASE_ID || ''
+  tableId: process.env.WPS_TABLE_ID || ''
 };
 
 const defaultLLMList = rawLLMConfigs.map(c => {

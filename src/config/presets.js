@@ -89,7 +89,7 @@ export function getResolvedPreset(id) {
     url: matchedTableConfig?.platform === 'feishu' ? matchedTableConfig.url : ''
   };
 
-  const wpsTableId = config.getEnv(`${prefix}_WPS_TABLE_ID`, config.getEnv(`${prefix}_WPS_BASE_ID`, fallbackWpsTableId));
+  const wpsTableId = config.getEnv(`${prefix}_WPS_TABLE_ID`, fallbackWpsTableId);
 
   const wps = {
     appId: config.getEnv(`${prefix}_WPS_APP_ID`, matchedTableConfig?.appId || config.wps.appId || ''),
@@ -167,6 +167,7 @@ export function getSafePresetForClient(id) {
     userPrompt: resolved.userPrompt,
     fields: resolved.fields,
     fieldMapping: resolved.fieldMapping,
+    postFilters: resolved.postFilters,
     platform: resolved.platform,
     llmConfig: {
       provider: resolved.llmProvider,

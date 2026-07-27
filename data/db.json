@@ -27,6 +27,97 @@
           "mimeType": "image/png"
         }
       ]
+    },
+    {
+      "md5": "a0d6059a275d4b587a9f3cb00d5ca8bb",
+      "fileName": "镇海基地第三方HSE监管日报（6月22日）.pdf",
+      "uploadTime": "2026-07-27T00:35:41.128Z",
+      "status": "done",
+      "progress": 100,
+      "originalPath": "C:\\Users\\gaoft\\Documents\\CodeSpace\\docex\\data\\uploads\\a0d6059a275d4b587a9f3cb00d5ca8bb.pdf",
+      "error": null,
+      "textPath": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/text.txt",
+      "images": [
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-1.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-2.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-3.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-4.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-5.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-6.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-7.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-8.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-9.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-10.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-11.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-12.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-13.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-14.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-15.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-16.png",
+          "mimeType": "image/png"
+        },
+        {
+          "path": "data/preprocessed/a0d6059a275d4b587a9f3cb00d5ca8bb/page-17.png",
+          "mimeType": "image/png"
+        }
+      ]
+    },
+    {
+      "md5": "ba484dd8b492518909e9087129db8b20",
+      "fileName": "2026-06-22检查问题2.docx",
+      "uploadTime": "2026-07-27T00:54:12.167Z",
+      "status": "done",
+      "progress": 100,
+      "originalPath": "C:\\Users\\gaoft\\Documents\\CodeSpace\\docex\\data\\uploads\\ba484dd8b492518909e9087129db8b20.docx",
+      "error": null,
+      "textPath": "data/preprocessed/ba484dd8b492518909e9087129db8b20/text.txt",
+      "structurePath": "data/preprocessed/ba484dd8b492518909e9087129db8b20/structure.json"
     }
   ]
 }

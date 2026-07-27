@@ -193,7 +193,7 @@ export default function DocumentExtractor({ presetId = null }) {
               fieldMapping: p.fieldMapping
             });
           } else if (p.platform === 'wps') {
-            const fid = p.wps?.tableId || p.wps?.baseId || p.tableConfig?.tableId || '';
+            const fid = p.wps?.tableId || p.tableConfig?.tableId || '';
             const appId = p.wps?.appId || '';
             const appSecret = p.wps?.appSecret || '';
             setWpsFileId(fid);
@@ -1048,7 +1048,8 @@ export default function DocumentExtractor({ presetId = null }) {
             systemPrompt: customPrompt,
             userPrompt: '请分析该文档并提取结构化字段：',
             fields: processedFields,
-            llmConfig
+            llmConfig,
+            postFilters: preset?.postFilters
           })
         });
         const data = await res.json();
@@ -1172,7 +1173,8 @@ export default function DocumentExtractor({ presetId = null }) {
           systemPrompt: customPrompt,
           userPrompt: '请分析该文档并提取结构化字段：',
           fields: processedFields,
-          llmConfig
+          llmConfig,
+          postFilters: preset?.postFilters
         })
       });
       const data = await res.json();

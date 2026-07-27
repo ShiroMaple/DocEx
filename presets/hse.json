@@ -63,6 +63,19 @@
       "desc": "发现隐患的日期 (YYYY-MM-DD)",
       "example": "",
       "isAdvancedOpen": false
+    },
+    {
+      "key": "contractor",
+      "label": "承包商/责任方",
+      "desc": "问题涉及的具体承包商或责任方单位名称，若未明确提及具体单位名称，填'未提及'",
+      "example": "宁波工程公司",
+      "isAdvancedOpen": false
+    }
+  ],
+  "postFilters": [
+    {
+      "name": "建安承包商过滤",
+      "condition": "if (!record.contractor || record.contractor === '无' || record.contractor === '未提及') return true; return record.contractor.includes('建安');"
     }
   ],
   "fieldMapping": {

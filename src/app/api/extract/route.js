@@ -71,7 +71,7 @@ function checkPromptSecurity(systemPrompt, userPrompt, fields) {
  */
 async function extractHandler(request) {
   try {
-    const { md5, systemPrompt, userPrompt, fields, llmConfig } = await request.json();
+    const { md5, systemPrompt, userPrompt, fields, llmConfig, postFilters } = await request.json();
 
     if (!md5) {
       return NextResponse.json({ error: '缺少 md5 参数' }, { status: 400 });
@@ -200,9 +200,42 @@ async function extractHandler(request) {
       llmConfig
     });
 
+    // ── 应用后置过滤引擎 (postFilters) ──
+    let filteredData = data;
+    if (postFilters && Array.isArray(postFilters) && postFilters.length > 0 && Array.isArray(data)) {
+      const originalCount = data.length;
+      const validResults = [];
+      const droppedResults = [];
+      
+      for (const record of data) {
+        let passed = true;
+        for (const filter of postFilters) {
+          if (filter.condition) {
+            try {
+              // 构造沙箱验证
+              const filterFn = new Function('record', filter.condition);
+              const result = filterFn(record);
+              if (!result) {
+                passed = false;
+                logger.info({ event: 'POST_FILTER_DROPPED', filterName: filter.name, record }, `记录被过滤引擎 [${filter.name}] 拦截`);
+                break;
+              }
+            } catch (err) {
+              logger.error({ event: 'POST_FILTER_ERROR', filterName: filter.name, error: err.message }, '执行后置过滤条件报错');
+            }
+          }
+        }
+        if (passed) validResults.push(record);
+        else droppedResults.push(record);
+      }
+      
+      filteredData = validResults;
+      logger.info({ event: 'POST_FILTER_COMPLETE', originalCount, finalCount: validResults.length, droppedCount: droppedResults.length }, '后置过滤引擎执行完毕');
+    }
+
     return NextResponse.json({
       success: true,
-      data,
+      data: filteredData,
       raw,
       tokenUsage: usage
     });
