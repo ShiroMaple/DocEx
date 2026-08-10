@@ -134,7 +134,8 @@ export async function extractCustomFields(multimodalData, { systemPrompt, userPr
     });
 
     const rawContent = response.choices[0].message.content;
-    const parsed = JSON.parse(rawContent);
+    const jsonStr = extractJsonBlock(rawContent) || rawContent;
+    const parsed = JSON.parse(jsonStr);
     const results = parsed.results || [];
     
     // 容错处理：大模型有时没有严格遵循 schema key，而是返回了中文列名或别名作为键值，进行防御性转换对齐
@@ -217,7 +218,8 @@ export async function extractCustomFields(multimodalData, { systemPrompt, userPr
     }
 
     try {
-      const parsed = JSON.parse(rawContent);
+      const jsonStr = extractJsonBlock(rawContent) || rawContent;
+      const parsed = JSON.parse(jsonStr);
       const results = parsed.results || [];
       const translated = translateResultKeys(results, fields);
 
@@ -253,6 +255,62 @@ export async function extractCustomFields(multimodalData, { systemPrompt, userPr
       throw err;
     }
   }
+}
+
+/**
+ * 提取有效的 JSON 块，防止尾部多余文本干扰解析
+ */
+function extractJsonBlock(str) {
+  if (!str) return null;
+  const startObj = str.indexOf('{');
+  const startArr = str.indexOf('[');
+  
+  let start = -1;
+  let startChar = '';
+  let endChar = '';
+  
+  if (startObj !== -1 && (startArr === -1 || startObj < startArr)) {
+    start = startObj;
+    startChar = '{';
+    endChar = '}';
+  } else if (startArr !== -1) {
+    start = startArr;
+    startChar = '[';
+    endChar = ']';
+  }
+  
+  if (start === -1) return null;
+  
+  let count = 0;
+  let inString = false;
+  let escape = false;
+  
+  for (let i = start; i < str.length; i++) {
+    const char = str[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === startChar) {
+        count++;
+      } else if (char === endChar) {
+        count--;
+        if (count === 0) {
+          return str.substring(start, i + 1);
+        }
+      }
+    }
+  }
+  return null;
 }
 
 /**

@@ -27,6 +27,9 @@ async function uploadHandler(request) {
     if (!file) {
       return NextResponse.json({ error: '未上传文件' }, { status: 400 });
     }
+    if (file.size === 0) {
+      return NextResponse.json({ error: '上传的文件不能为空（0字节）' }, { status: 400 });
+    }
 
     const fileName = file.name;
     const ext = path.extname(fileName).toLowerCase();

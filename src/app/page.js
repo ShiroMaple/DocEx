@@ -776,6 +776,10 @@ export default function DocumentExtractor({ presetId = null }) {
         alert(`不支持的文件格式: ${file.name}`);
         continue;
       }
+      if (file.size === 0) {
+        alert(`不能上传空文件: ${file.name}`);
+        continue;
+      }
       if (file.size > 50 * 1024 * 1024) {
         alert(`文件过大（最大 50MB）: ${file.name}`);
         continue;

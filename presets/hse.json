@@ -3,7 +3,7 @@
   "name": "智能结构化提取 · 安全环保部",
   "department": "安全环保部",
   "subtitle": "预设用于提取安全检查报告的字段和提示词",
-  "badgeText": "智能结构化提取文档数据-【安全环保部】专用",
+  "badgeText": "智能结构化文档数据提取-【安全环保部】专用",
   "icon": "🛡️",
   "tableConfigId": "wps_hse",
   "platform": "wps",

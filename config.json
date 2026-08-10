@@ -21,9 +21,9 @@
       {
         "id": "default",
         "name": "默认配置",
-        "provider": "XiaoMi",
-        "baseUrl": "https://token-plan-cn.xiaomimimo.com/v1",
-        "model": "mimo-v2.5",
+        "provider": "Kimi",
+        "baseUrl": "https://api.moonshot.cn/v1",
+        "model": "kimi-k2.6",
         "isDefault": true
       }
     ]
@@ -43,8 +43,8 @@
         "name": "飞书测试配置",
         "platform": "feishu",
         "baseUrl": "https://cli-aac44e92a2b89bd5.feishu.cn/base/",
-        "appToken": "[REDACTED_FEISHU_APP_TOKEN]",
-        "tableId": "[REDACTED_FEISHU_TABLE_ID]",
+        "appToken": "FJvNwbnCxi6ymuky8bTcRTu2nS6",
+        "tableId": "tbla78TDmVdUqIyt",
         "isDefault": true
       },
       {
