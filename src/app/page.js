@@ -653,7 +653,7 @@ export default function DocumentExtractor({ presetId = null }) {
       setActiveModelLabel(data.model);
 
       // 只提供测试连通性，不提供保存
-      showToast(`🎉 模型 [${model}] 连接测试成功！`);
+      showToast(`🎉 模型 [${data.model || llmConfig.model}] 连接测试成功！`);
 
     } catch (err) {
       setLlmTestError(err.message);
