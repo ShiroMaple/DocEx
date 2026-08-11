@@ -144,6 +144,56 @@ export default function DocumentExtractor({ presetId = null }) {
   const [pushResult, setPushResult] = useState(null);
   const [rawLlmResponse, setRawLlmResponse] = useState('');
   const [isLlmModalOpen, setIsLlmModalOpen] = useState(false);
+  const [isDetectingFields, setIsDetectingFields] = useState(false);
+
+  const autoDetectFields = () => {
+    if (!llmConnected) {
+      showToast('⚠️ 智能分析受阻：请先在顶部网关设置中测试连接通过！', 'error');
+      return;
+    }
+    if (filesQueue.length === 0) {
+      showToast('⚠️ 智能分析受阻：请先在步骤 1 中上传至少一个待分析文档！', 'error');
+      return;
+    }
+    const firstFile = filesQueue[0];
+    if (firstFile.status !== 'done') {
+      showToast('⚠️ 智能分析受阻：第一个文档尚未预处理完成，请稍候。', 'error');
+      return;
+    }
+
+    setIsDetectingFields(true);
+    showToast('🔮 AI 正在尝试智能分析文档首页以推演最佳字段定义，请稍候...');
+
+    fetch('/api/auto-detect-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        md5: firstFile.md5,
+        llmConfig
+      })
+    })
+      .then(res => {
+        if (!res.ok) {
+          return res.json().then(d => { throw new Error(d.error || '分析自动识别失败') });
+        }
+        return res.json();
+      })
+      .then(data => {
+        if (data.success && data.fields) {
+          setFields(data.fields);
+          showToast(`🔮 智能推荐成功！一键生成并覆盖了 ${data.fields.length} 个核心字段定义。`);
+        } else {
+          showToast(data.error || '⚠️ 智能推演完毕，模型未能给出有效的字段定义。', 'error');
+        }
+      })
+      .catch(err => {
+        console.error('智能提取失败:', err);
+        showToast(`❌ 字段自动分析出错: ${err.message}`, 'error');
+      })
+      .finally(() => {
+        setIsDetectingFields(false);
+      });
+  };
 
   // ── Load Preset Config (Default or Specific) ──
   useEffect(() => {
@@ -2273,19 +2323,33 @@ export default function DocumentExtractor({ presetId = null }) {
                         <h2 className="font-serif font-medium text-lg">步骤 2: 配置字段</h2>
                       </div>
 
-                      {canCustomFields && (
-                        <button
-                          onClick={() => {
-                            if (confirm('是否还原到默认字段矩阵？这将丢失现有配置。')) {
-                              if (preset?.fields) setFields(preset.fields);
-                              if (preset?.systemPrompt) setCustomPrompt(preset.systemPrompt);
-                            }
-                          }}
-                          className="text-xs font-semibold text-olive-gray hover:text-near-black bg-warm-sand/50 hover:bg-warm-sand px-3 py-1 rounded transition border border-border-warm"
-                        >
-                          重置为默认字段
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {preset?.allowAutoDetectFields && (
+                          <button
+                            onClick={autoDetectFields}
+                            disabled={isDetectingFields}
+                            className="text-xs font-semibold text-terracotta hover:text-terracotta-hover bg-warm-sand/50 hover:bg-warm-sand px-3 py-1.5 rounded transition border border-border-warm flex items-center gap-1.5 disabled:opacity-50"
+                            title="让 AI 自动分析首张文档，智能推演并覆写字段定义"
+                          >
+                            {isDetectingFields && <Loader2 size={11} className="animate-spin text-terracotta" />}
+                            <span>{isDetectingFields ? '分析推荐中...' : '🔮 自动识别字段'}</span>
+                          </button>
+                        )}
+
+                        {canCustomFields && (
+                          <button
+                            onClick={() => {
+                              if (confirm('是否还原到默认字段矩阵？这将丢失现有配置。')) {
+                                if (preset?.fields) setFields(preset.fields);
+                                if (preset?.systemPrompt) setCustomPrompt(preset.systemPrompt);
+                              }
+                            }}
+                            className="text-xs font-semibold text-olive-gray hover:text-near-black bg-warm-sand/50 hover:bg-warm-sand px-3 py-1 rounded transition border border-border-warm"
+                          >
+                            重置为默认字段
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {!canCustomFields && (

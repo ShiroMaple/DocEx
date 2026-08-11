@@ -159,6 +159,7 @@ export function getSafePresetForClient(id) {
     icon: resolved.icon || (resolved.id === 'default' ? '🌐' : '⚙️'),
     tableConfigId: resolved.tableConfigId || '',
     locked: resolved.locked,
+    allowAutoDetectFields: Boolean(resolved.allowAutoDetectFields),
     allowCustomModel: resolved.allowCustomModel,
     allowCustomPlatform: resolved.allowCustomPlatform,
     allowCustomFields: resolved.allowCustomFields,

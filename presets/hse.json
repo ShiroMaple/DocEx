@@ -8,6 +8,7 @@
   "tableConfigId": "wps_hse",
   "platform": "wps",
   "locked": false,
+  "allowAutoDetectFields": true,
   "allowCustomModel": true,
   "allowCustomPlatform": true,
   "allowCustomFields": false,
