@@ -58,6 +58,15 @@ export default function DocumentExtractor({ presetId = null }) {
   const [activePopover, setActivePopover] = useState(null); // 'table' | 'llm' | null
   const [toast, setToast] = useState('');
 
+  // ── Enter step 4 auto open table popover ──
+  useEffect(() => {
+    if (activeStep === 4) {
+      setTimeout(() => {
+        setActivePopover('table');
+      }, 50);
+    }
+  }, [activeStep]);
+
   // ── Fetch all available presets list on mount ──
   useEffect(() => {
     fetch('/api/presets')
@@ -151,15 +160,12 @@ export default function DocumentExtractor({ presetId = null }) {
       showToast('⚠️ 智能分析受阻：请先在顶部网关设置中测试连接通过！', 'error');
       return;
     }
-    if (filesQueue.length === 0) {
-      showToast('⚠️ 智能分析受阻：请先在步骤 1 中上传至少一个待分析文档！', 'error');
+    const doneFiles = filesQueue.filter(f => f.status === 'done');
+    if (doneFiles.length === 0) {
+      showToast('⚠️ 智能分析受阻：请先在步骤 1 中上传并就绪至少一个待分析文档！', 'error');
       return;
     }
-    const firstFile = filesQueue[0];
-    if (firstFile.status !== 'done') {
-      showToast('⚠️ 智能分析受阻：第一个文档尚未预处理完成，请稍候。', 'error');
-      return;
-    }
+    const firstFile = doneFiles[0];
 
     setIsDetectingFields(true);
     showToast('🔮 AI 正在尝试智能分析文档首页以推演最佳字段定义，请稍候...');
@@ -632,6 +638,24 @@ export default function DocumentExtractor({ presetId = null }) {
     }
   };
 
+  // ── Smart Redirection for Step 3 Push to Step 4 ──
+  const handleStep3Push = async () => {
+    if (isTableConnected) {
+      showToast('⚡ 多维表连接已就绪，正在直接推送数据，请稍候...');
+      pushToSpreadsheet();
+    } else {
+      showToast('🔮 正在检查多维表格连接状态...');
+      const autoOk = await verifyTableConnection();
+      if (autoOk) {
+        showToast('⚡ 自动连通成功！正在推送数据，请稍候...');
+        pushToSpreadsheet();
+      } else {
+        showToast('⚠️ 未检测到多维表配置或已连通的表格，已为您自动切换到 [步骤四] 进行设置！');
+        setActiveStep(4);
+      }
+    }
+  };
+
   // ── LLM Connection verification ──
   const verifyLlmConnection = async () => {
     setIsTestingLlm(true);
@@ -967,17 +991,7 @@ export default function DocumentExtractor({ presetId = null }) {
       alert('请先上传文件或从历史记录中选择至少一个已准备就绪的文档！');
       return;
     }
-    if (!isTableConnected) {
-      const autoOk = await verifyTableConnection();
-      if (!autoOk) {
-        if (preset?.locked || preset?.allowCustomPlatform === false) {
-          showToast('⚠️ 预设多维表格连通验证失败，请检查配置文件或网络情况');
-        } else {
-          alert('请先点击顶部状态栏的【📊 多维表格】同步并验证云端列头！');
-        }
-        return;
-      }
-    }
+    // 解耦后，大模型解析前不再阻断校验多维表格连接
 
     setExtractionError('');
     setExtractedIssues([]);
@@ -1253,10 +1267,7 @@ export default function DocumentExtractor({ presetId = null }) {
     const confirmRetry = window.confirm('将移除下表中相关记录，由大模型重新解析，是否确认？');
     if (!confirmRetry) return;
 
-    if (!isTableConnected) {
-      alert('请先连接多维表格！');
-      return;
-    }
+    // 解耦后，单文件重试不再检验多维表连接状态
 
     setIsExtracting(true);
     setExtractionError('');
@@ -1616,15 +1627,19 @@ export default function DocumentExtractor({ presetId = null }) {
     const isStep2Done = extractedIssues.length > 0;
     const isStep3Done = pushResult?.success === true;
 
+    const isStep4Done = pushResult?.success === true;
+
     const steps = [
       { number: 1, label: '上传文档', done: isStep1Done },
       { number: 2, label: '配置字段', done: isStep2Done },
       { number: 3, label: '解析结果', done: isStep3Done },
+      { number: 4, label: '推送多维表', done: isStep4Done },
     ];
 
     let progressWidth = '0%';
-    if (activeStep === 2) progressWidth = '50%';
-    if (activeStep === 3) progressWidth = '100%';
+    if (activeStep === 2) progressWidth = '33.3%';
+    if (activeStep === 3) progressWidth = '66.6%';
+    if (activeStep === 4) progressWidth = '100%';
 
     return (
       <div className="w-[600px] relative select-none">
@@ -1647,12 +1662,8 @@ export default function DocumentExtractor({ presetId = null }) {
               <div
                 key={step.number}
                 onClick={() => {
-                  if (step.number === 2 && filesQueue.length === 0) {
-                    showToast('请先上传或选择待解析文档！');
-                    return;
-                  }
                   if (step.number === 3 && extractedIssues.length === 0 && !extractionError) {
-                    showToast('请先在第 2 步中执行大模型数据解析提取！');
+                    showToast('请先按步骤执行信息解析提取！');
                     return;
                   }
                   setActiveStep(step.number);
@@ -2325,8 +2336,8 @@ export default function DocumentExtractor({ presetId = null }) {
                         {preset?.allowAutoDetectFields && (
                           <button
                             onClick={autoDetectFields}
-                            disabled={isDetectingFields}
-                            className="text-xs font-semibold text-terracotta hover:text-terracotta-hover bg-warm-sand/50 hover:bg-warm-sand px-3 py-1.5 rounded transition border border-border-warm flex items-center gap-1.5 disabled:opacity-50"
+                            disabled={isDetectingFields || filesQueue.filter(f => f.status === 'done').length === 0}
+                            className="text-xs font-semibold text-terracotta hover:text-terracotta-hover bg-warm-sand/50 hover:bg-warm-sand px-3 py-1.5 rounded transition border border-border-warm flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed"
                             title="让 AI 自动分析首张文档，智能推演并覆写字段定义"
                           >
                             {isDetectingFields && <Loader2 size={11} className="animate-spin text-terracotta" />}
@@ -2365,9 +2376,8 @@ export default function DocumentExtractor({ presetId = null }) {
                         <thead>
                           <tr className="bg-parchment border-b border-border-cream">
                             <th className="p-4 font-bold text-near-black w-[22%] whitespace-nowrap">提取字段</th>
-                            <th className="p-4 font-bold text-near-black w-[27%] whitespace-nowrap">描述</th>
-                            <th className="p-4 font-bold text-near-black w-[23%] whitespace-nowrap">示例</th>
-                            <th className="p-4 font-bold text-near-black w-[22%] whitespace-nowrap">多维表字段</th>
+                            <th className="p-4 font-bold text-near-black w-[40%] whitespace-nowrap">描述</th>
+                            <th className="p-4 font-bold text-near-black w-[32%] whitespace-nowrap">示例</th>
                             <th className="p-4 font-bold text-near-black text-center w-[6%] whitespace-nowrap">操作</th>
                           </tr>
                         </thead>
@@ -2415,56 +2425,7 @@ export default function DocumentExtractor({ presetId = null }) {
                                   />
                                 </td>
 
-                                {/* Column 4: Mappings (10%) */}
-                                <td className="p-4 align-top">
-                                  {isSchemaLoading ? (
-                                    <div className="text-xs text-stone-gray flex items-center gap-1.5 py-1.5">
-                                      <Loader2 size={12} className="animate-spin" />
-                                      <span>同步中...</span>
-                                    </div>
-                                  ) : isTableConnected ? (
-                                    <div className="flex flex-col gap-1.5">
-                                      <select
-                                        value={mappedCol || ''}
-                                        onChange={(e) => {
-                                          const oldCol = Object.keys(fieldMappings).find(k => fieldMappings[k] === currentKey);
-                                          const newMappings = { ...fieldMappings };
-                                          if (oldCol) delete newMappings[oldCol];
 
-                                          if (e.target.value) {
-                                            newMappings[e.target.value] = currentKey;
-                                          }
-                                          setFieldMappings(newMappings);
-
-                                          const targetId = platform === 'wps' ? wpsFileId : `${feishuAppToken}_${feishuTableId}`;
-                                          localStorage.setItem(`docex_mapping_${targetId}`, JSON.stringify(newMappings));
-                                        }}
-                                        className="bg-warm-sand/30 border border-border-warm rounded pl-2 pr-7 py-1.5 text-xs outline-none cursor-pointer w-full focus:bg-white truncate"
-                                      >
-                                        <option value="">❌ 不推送</option>
-                                        {schemaFields.filter(sf => !sf.isReadOnly).map(sf => (
-                                          <option value={sf.name} key={sf.id || sf.name}>
-                                            {sf.name}
-                                          </option>
-                                        ))}
-                                      </select>
-
-                                      {showMissingAlert && (
-                                        <div className="bg-red-50/50 border border-red-100 rounded p-2 flex flex-col gap-1.5">
-                                          <span className="text-xs text-error-crimson font-medium">⚠️ 目标表缺少此列</span>
-                                          <button
-                                            onClick={() => createTableColumn(f.label)}
-                                            className="text-xs font-bold text-terracotta hover:underline text-left"
-                                          >
-                                            [一键在云端新建 "{f.label}" 列]
-                                          </button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <span className="text-stone-gray text-xs italic">请先连接顶部多维表格</span>
-                                  )}
-                                </td>
 
                                 <td className="p-4 align-top text-center">
                                   {canCustomFields ? (
@@ -2544,6 +2505,212 @@ export default function DocumentExtractor({ presetId = null }) {
                       <span className="text-xs text-stone-gray leading-normal">
                         * 提示词在输入给大模型之前，会自动追加防注入审查语句规范约束。
                       </span>
+                    </div>
+                  </section>
+                </div>
+
+              </div>
+            </motion.div>
+          )}
+
+          {activeStep === 4 && (
+            <motion.div
+              key="step-4"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 10 }}
+              transition={{ duration: 0.25 }}
+              className="flex flex-col gap-6"
+            >
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+                {/* Left column: Data preview (2/3 width) */}
+                <div className="lg:col-span-2">
+                  <section className="bg-ivory border border-border-cream rounded-xl p-8 shadow-sm">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <Sparkles className="w-5 h-5 text-terracotta" />
+                        <h2 className="font-serif font-medium text-lg">步骤 4: 推送多维表格</h2>
+                      </div>
+                      <span className="text-xs text-stone-gray font-semibold bg-warm-sand/40 px-3 py-1 rounded">
+                        共 {extractedIssues.length} 条识别记录
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="w-1 bg-terracotta h-3 rounded-full" />
+                      <span className="text-xs font-bold text-olive-gray uppercase tracking-wider">推送信息预览</span>
+                    </div>
+
+                    {extractedIssues.length === 0 ? (
+                      <div className="border border-dashed border-border-cream rounded-lg bg-white py-16 flex flex-col items-center justify-center gap-3 text-stone-gray">
+                        <span className="text-3xl">⏳</span>
+                        <span className="text-xs font-semibold">暂无解析结果</span>
+                        <span className="text-xs font-semibold">请完成步骤 3 的提取后再在此处查看</span>
+                      </div>
+                    ) : (
+                      <div className="border border-border-cream rounded-lg overflow-hidden bg-white max-h-[500px] overflow-auto">
+                        <table className="w-full border-collapse text-left text-xs table-fixed min-w-[800px]">
+                          <thead>
+                            <tr className="bg-parchment border-b border-border-cream">
+                              <th className="p-3 font-bold text-near-black w-[50px] text-center sticky top-0 bg-parchment border-r border-border-cream">#</th>
+                              <th className="p-3 font-bold text-near-black w-[120px] text-left sticky top-0 bg-parchment border-r-2 border-r-stone-200">数据来源</th>
+                              {fields.map((f, idx) => (
+                                <th key={idx} className="p-3 font-bold text-near-black truncate sticky top-0 bg-parchment" title={f.label}>
+                                  {f.label}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border-cream">
+                            {extractedIssues.map((issue, rowIndex) => (
+                              <tr key={rowIndex} className="hover:bg-ivory/30 transition">
+                                <td className="p-3 font-bold text-stone-gray text-center sticky left-0 z-10 bg-white border-r border-border-cream w-[50px]">{rowIndex + 1}</td>
+                                <td className="p-2 align-top sticky left-[50px] z-10 bg-stone-50/90 border-r-2 border-r-stone-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] border-l-3 border-l-terracotta/40 w-[120px] truncate" title={filesQueue.find(f => f.md5 === issue._fileMd5)?.fileName || '手动添加'}>
+                                  {filesQueue.find(f => f.md5 === issue._fileMd5)?.fileName || '手动添加'}
+                                </td>
+                                {fields.map((f, colIndex) => {
+                                  const key = f.key || `field_${colIndex + 1}`;
+                                  return (
+                                    <td key={colIndex} className="p-3 align-top max-w-[200px] truncate" title={issue[key] || ''}>
+                                      {issue[key] || ''}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </section>
+                </div>
+
+                {/* Right column: Table credentials & mappings (1/3 width) */}
+                <div className="lg:col-span-1">
+                  <section className="bg-ivory border border-border-cream rounded-xl p-8 shadow-sm">
+                    <h3 className="font-serif font-bold text-base border-b border-border-cream pb-3 mb-4 flex items-center gap-2">
+                      <span>📊</span> 推送配置面板
+                    </h3>
+
+                    {!canCustomPlatform && (
+                      <div className="p-2.5 mb-4 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs flex items-center gap-1.5 font-medium leading-relaxed">
+                        🔒 配置已由部门预设锁定。
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-4">
+                      {/* 3. Field mappings */}
+                      <div className="flex flex-col gap-2">
+                        <div className="flex justify-between items-center">
+                          <label className="text-xs font-bold text-olive-gray uppercase tracking-wider">推送字段映射</label>
+                          {isTableConnected && (
+                            <button
+                              onClick={() => {
+                                showToast('正在同步所有字段至多维表，请稍候...');
+                                Promise.all(fields.map(f => createTableColumn(f.label)))
+                                  .then(() => {
+                                    showToast('🎉 云端同步列头并映射成功！');
+                                  })
+                                  .catch(err => {
+                                    showToast(`❌ 同步失败: ${err.message}`, 'error');
+                                  });
+                              }}
+                              className="text-[10px] font-bold text-terracotta hover:underline"
+                            >
+                              [一键同步云端所有缺列]
+                            </button>
+                          )}
+                        </div>
+
+                        {isTableConnected ? (
+                          <div className="flex flex-col gap-2.5 border border-border-cream/50 p-3 rounded bg-white/40">
+                            {fields.map((f, idx) => {
+                              const currentKey = f.key || `field_${idx + 1}`;
+                              const mappedCol = Object.keys(fieldMappings).find(col => fieldMappings[col] === currentKey);
+
+                              return (
+                                <div key={idx} className="flex items-center justify-between gap-3 bg-white p-2 rounded border border-border-cream shadow-2xs">
+                                  <span className="text-xs font-semibold text-near-black truncate max-w-[100px]" title={f.label}>{f.label}</span>
+                                  <div className="flex-1 flex flex-col gap-1 max-w-[150px]">
+                                    <select
+                                      value={mappedCol || ''}
+                                      onChange={(e) => {
+                                        const oldCol = Object.keys(fieldMappings).find(k => fieldMappings[k] === currentKey);
+                                        const newMappings = { ...fieldMappings };
+                                        if (oldCol) delete newMappings[oldCol];
+
+                                        if (e.target.value) {
+                                          newMappings[e.target.value] = currentKey;
+                                        }
+                                        setFieldMappings(newMappings);
+
+                                        const targetId = platform === 'wps' ? wpsFileId : `${feishuAppToken}_${feishuTableId}`;
+                                        localStorage.setItem(`docex_mapping_${targetId}`, JSON.stringify(newMappings));
+                                      }}
+                                      className="bg-warm-sand/30 border border-border-warm rounded pl-1 pr-5 py-1 text-[11px] outline-none cursor-pointer focus:bg-white truncate"
+                                    >
+                                      <option value="">❌ 不推送</option>
+                                      {schemaFields.filter(sf => !sf.isReadOnly).map(sf => (
+                                        <option value={sf.name} key={sf.id || sf.name}>
+                                          {sf.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {!mappedCol && (
+                                      <button
+                                        onClick={() => createTableColumn(f.label)}
+                                        className="text-[9px] text-terracotta text-left font-semibold hover:underline"
+                                      >
+                                        [一键在云端新建列]
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-center py-4 bg-stone-50 border border-dashed border-border-cream rounded text-stone-gray text-xs italic">
+                            请先在上方连接多维表以载入列定义进行映射
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 4. One-click execute push button */}
+                      <button
+                        onClick={pushToSpreadsheet}
+                        disabled={isPushing || !isTableConnected || extractedIssues.length === 0}
+                        className="w-full bg-terracotta hover:bg-terracotta-hover disabled:opacity-40 text-ivory text-xs font-bold py-3 rounded-lg shadow transition mt-2 flex items-center justify-center gap-1.5"
+                      >
+                        {isPushing ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />
+                            <span>正在将数据写入云端多维表格...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>🚀 确认推送数据到云端多维表格</span>
+                          </>
+                        )}
+                      </button>
+
+                      {pushResult && (
+                        <div className={`p-3 rounded-lg text-xs leading-relaxed border mt-2 flex flex-col gap-1.5 ${pushResult.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                          <span className="font-bold">${pushResult.message}</span>
+                          {pushResult.success && pushResult.link && (
+                            <a
+                              href={pushResult.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-terracotta font-bold hover:underline flex items-center gap-1"
+                            >
+                              <span>点击此处，立即在新页面中打开云端多维表格 ↗</span>
+                            </a>
+                          )}
+                        </div>
+                      )}
+
                     </div>
                   </section>
                 </div>
@@ -2903,26 +3070,7 @@ export default function DocumentExtractor({ presetId = null }) {
                       </table>
                     </div>
 
-                    {/* Push feedback results */}
-                    {pushResult && (
-                      <div className={`border rounded-lg p-4 flex gap-3 text-xs ${pushResult.success ? 'border-green-200 bg-green-50/50 text-green-700' : 'border-red-200 bg-red-50/50 text-error-crimson'}`}>
-                        {pushResult.success ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" /> : <AlertTriangle className="w-5 h-5 flex-shrink-0" />}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold">{pushResult.success ? '云端推送成功！' : '写入失败'}</p>
-                          <p className="mt-0.5 leading-relaxed">{pushResult.message}</p>
-                          {pushResult.success && pushResult.link && (
-                            <a
-                              href={pushResult.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-terracotta font-bold hover:underline inline-flex items-center gap-1 mt-2"
-                            >
-                              前往多维表格查看结果 <ExternalLink size={11} />
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    )}
+
 
                   </div>
                 )}
@@ -2951,6 +3099,15 @@ export default function DocumentExtractor({ presetId = null }) {
             {activeStep === 3 && (
               <button
                 onClick={() => setActiveStep(2)}
+                className="border border-stone-gray hover:border-near-black text-olive-gray hover:text-near-black px-4 py-2 rounded text-xs font-semibold flex items-center gap-1.5 transition bg-white shadow-sm"
+              >
+                <ArrowLeft size={14} />
+                <span>返回上一步</span>
+              </button>
+            )}
+            {activeStep === 4 && (
+              <button
+                onClick={() => setActiveStep(3)}
                 className="border border-stone-gray hover:border-near-black text-olive-gray hover:text-near-black px-4 py-2 rounded text-xs font-semibold flex items-center gap-1.5 transition bg-white shadow-sm"
               >
                 <ArrowLeft size={14} />
@@ -3005,7 +3162,7 @@ export default function DocumentExtractor({ presetId = null }) {
             {activeStep === 2 && (
               <button
                 onClick={startExtraction}
-                disabled={isExtracting || filesQueue.filter(f => f.status === 'done').length === 0 || !isTableConnected}
+                disabled={isExtracting || filesQueue.filter(f => f.status === 'done').length === 0}
                 className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-8 py-2.5 rounded transition flex items-center gap-1.5 shadow-sm disabled:opacity-40"
               >
                 {isExtracting ? (
@@ -3023,15 +3180,48 @@ export default function DocumentExtractor({ presetId = null }) {
             )}
 
             {activeStep === 3 && extractedIssues.length > 0 && (
-              <button
-                onClick={pushToSpreadsheet}
-                disabled={isPushing}
-                className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-6 py-2.5 rounded transition disabled:opacity-40 flex items-center gap-1.5 shadow-sm"
-              >
-                {isPushing && <Loader2 size={12} className="animate-spin" />}
-                <span>{isPushing ? '正在推送数据...' : '已核对识别结果，推送至多维表格'}</span>
-              </button>
+              <>
+                <button
+                  onClick={() => setActiveStep(4)}
+                  className="px-5 py-2.5 rounded text-xs font-semibold border border-stone-gray/40 text-olive-gray hover:text-near-black bg-white hover:bg-warm-sand/20 transition shadow-xs flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <span>配置多维表</span>
+                  <ArrowRight size={14} />
+                </button>
+
+                {pushResult?.success === true ? (
+                  <a
+                    href={pushResult.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-green-700 hover:bg-green-800 text-white text-xs font-semibold px-6 py-2.5 rounded transition flex items-center gap-1.5 shadow-md hover:scale-[1.01] duration-150 whitespace-nowrap"
+                  >
+                    <CheckCircle2 size={13} className="text-green-200" />
+                    <span>🎉 写入成功！点击前往多维表格查看结果 ↗</span>
+                  </a>
+                ) : (
+                  <button
+                    onClick={handleStep3Push}
+                    disabled={isPushing}
+                    className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-6 py-2.5 rounded transition disabled:opacity-40 flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+                  >
+                    {isPushing && <Loader2 size={12} className="animate-spin" />}
+                    <span>{isPushing ? '正在推送数据...' : '已核对识别结果，一键推送'}</span>
+                  </button>
+                )}
+
+                {pushResult && !pushResult.success && (
+                  <div className="border rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs shadow-sm max-w-[280px] border-red-200 bg-red-50 text-error-crimson">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-600" />
+                    <div className="flex flex-col text-[11px] leading-tight min-w-0">
+                      <span className="font-bold">写入失败</span>
+                      <span className="opacity-90 truncate">{pushResult.message}</span>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
+
           </div>
 
         </div>
