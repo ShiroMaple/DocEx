@@ -26,7 +26,7 @@ export async function extractPdfText(filePath) {
       const page = await doc.getPage(i);
       const textContent = await page.getTextContent();
       const pageText = textContent.items.map(item => item.str || '').join(' ');
-      textBuilder.push(pageText);
+      textBuilder.push(`--- [PAGE_START: ${i}] ---\n${pageText}\n--- [PAGE_END: ${i}] ---`);
     }
     text = textBuilder.join('\n\n');
   } catch (error) {

@@ -39,6 +39,13 @@ export async function extractCustomFields(multimodalData, { systemPrompt, userPr
     required.push(f.key);
   });
 
+  // 隐式插桩系统私有属性：_page 页码定位
+  properties['_page'] = {
+    type: 'string',
+    description: '此条记录在原始文本中所在的页码（基于 --- [PAGE_START: X] --- 系统标记定位。若未识别出或为单页文档，输出 "1"）'
+  };
+  required.push('_page');
+
   const jsonSchema = {
     type: 'object',
     properties: {
@@ -349,6 +356,18 @@ function translateResultKeys(results, fields) {
       // 确保输出为 String 格式，便于表格就地编辑和防崩溃处理
       newItem[targetKey] = foundValue !== undefined && foundValue !== null ? String(foundValue) : '';
     });
+
+    // 特殊提取并保留系统私有页码字段
+    let pageVal = undefined;
+    const pageKeys = ['_page', 'page', '页码', '页'];
+    for (const pk of pageKeys) {
+      if (item[pk] !== undefined) {
+        pageVal = item[pk];
+        break;
+      }
+    }
+    newItem['_page'] = pageVal !== undefined && pageVal !== null ? String(pageVal) : '';
+
     return newItem;
   });
 }
@@ -414,6 +433,13 @@ export async function* extractCustomFieldsStream(multimodalData, { systemPrompt,
     };
     required.push(f.key);
   });
+
+  // 隐式插桩系统私有属性：_page 页码定位
+  properties['_page'] = {
+    type: 'string',
+    description: '此条记录在原始文本中所在的页码（基于 --- [PAGE_START: X] --- 系统标记定位。若未识别出或为单页文档，输出 "1"）'
+  };
+  required.push('_page');
 
   const jsonSchema = {
     type: 'object',

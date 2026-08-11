@@ -108,7 +108,7 @@ async function processPdf(filePath, outputDir, md5) {
       const page = await doc.getPage(i);
       const textContent = await page.getTextContent();
       const pageText = textContent.items.map(item => item.str || '').join(' ');
-      textBuilder.push(pageText);
+      textBuilder.push(`--- [PAGE_START: ${i}] ---\n${pageText}\n--- [PAGE_END: ${i}] ---`);
       
       // 更新进度
       const progressPercent = Math.min(10 + Math.floor((i / doc.numPages) * 30), 40);

@@ -1484,9 +1484,14 @@ export default function DocumentExtractor({ presetId = null }) {
     }
 
     try {
-      const headers = fields.map(f => f.label || '未命名列');
       const dataToExport = extractedIssues.map((issue, idx) => {
         const row = { '序号': idx + 1 };
+
+        // 增加数据来源和页码列导出到 Excel
+        const fileObj = filesQueue.find(f => f.md5 === issue._fileMd5);
+        row['数据来源'] = fileObj ? fileObj.fileName : '手动添加';
+        row['所在页码'] = issue._page ? ("第 " + issue._page + " 页") : '第 1 页';
+
         fields.forEach((f, colIdx) => {
           const key = f.key || `field_${colIdx + 1}`;
           row[f.label || `列_${colIdx + 1}`] = issue[key] || '';
@@ -2804,27 +2809,81 @@ export default function DocumentExtractor({ presetId = null }) {
                     </div>
 
                     {/* Results grid */}
-                    <div className="border border-border-cream rounded-lg bg-white shadow-sm overflow-visible">
-                      <div className="overflow-visible">
-                        <table className="w-full border-collapse text-left text-xs table-fixed">
-                          <thead className="sticky top-16 z-10 bg-parchment border-b border-border-cream shadow-[0_1px_0_0_#e8e6dc] [&_th:first-child]:rounded-tl-lg [&_th:last-child]:rounded-tr-lg">
+                    <div className="border border-border-cream rounded-lg bg-white shadow-sm max-h-[650px] overflow-auto">
+                      <div className="overflow-auto max-h-[650px]">
+                        <table className="min-w-[1300px] w-full border-collapse text-left text-xs table-fixed">
+                          <thead className="sticky top-0 z-10 bg-parchment border-b border-border-cream shadow-[0_1px_0_0_#e8e6dc] [&_th:first-child]:rounded-tl-lg [&_th:last-child]:rounded-tr-lg">
                             <tr>
-                              <th className="p-3 font-bold text-near-black w-[4%] text-center whitespace-nowrap">#</th>
+                              <th className="p-3 font-bold text-near-black w-[50px] text-center whitespace-nowrap sticky left-0 top-0 z-40 bg-parchment border-r border-border-cream shadow-[0_1px_0_0_#e8e6dc]">#</th>
+                              <th className="p-3 font-bold text-near-black w-[100px] text-left whitespace-nowrap sticky left-[50px] top-0 z-40 bg-parchment border-r-2 border-r-stone-200 shadow-[2px_1px_0_0_#e8e6dc] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">信息来源</th>
                               {fields.map((f, idx) => {
-                                const dataColWidth = fields.length > 0 ? `${(90 / fields.length).toFixed(2)}%` : '90%';
+                                const dataColWidth = fields.length > 0 ? `${(85 / fields.length).toFixed(2)}%` : '85%';
                                 return (
-                                  <th key={idx} style={{ width: dataColWidth }} className="p-3 font-bold text-near-black truncate" title={f.label}>
+                                  <th key={idx} style={{ width: dataColWidth }} className="p-3 font-bold text-near-black truncate sticky top-0 z-30 bg-parchment" title={f.label}>
                                     {f.label || `列_${idx + 1}`}
                                   </th>
                                 );
                               })}
-                              <th className="p-3 font-bold text-near-black text-center w-[6%] whitespace-nowrap">操作</th>
+                              <th className="p-3 font-bold text-near-black text-center w-[6%] whitespace-nowrap sticky top-0 z-30 bg-parchment">操作</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border-cream">
                             {extractedIssues.map((issue, rowIndex) => (
                               <tr key={rowIndex} className="hover:bg-ivory/30 transition">
-                                <td className="p-3 font-bold text-stone-gray text-center">{rowIndex + 1}</td>
+                                <td className="p-3 font-bold text-stone-gray text-center sticky left-0 z-10 bg-white border-r border-border-cream w-[50px]">{rowIndex + 1}</td>
+
+                                {/* 只读冻结列：数据源与页码 */}
+                                <td className="p-2 align-top sticky left-[50px] z-10 bg-stone-50/90 border-r-2 border-r-stone-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] border-l-3 border-l-terracotta/40 w-[100px]">
+                                  <div className="flex flex-col gap-1 text-[10px] leading-tight w-full">
+                                    {(() => {
+                                      const fileObj = filesQueue.find(f => f.md5 === issue._fileMd5);
+                                      const fileName = fileObj ? fileObj.fileName : '手动添加';
+                                      const isManual = !issue._fileMd5;
+                                      // 10 个字符以上触发 truncate 截断，且支持文件名较长时折行换行显示
+                                      const displayName = fileName.length > 10 ? (fileName.slice(0, 10) + '...') : fileName;
+                                      // 根据文件后缀判定渲染 pdf.svg 或者是 word.svg
+                                      const ext = fileName.split('.').pop().toLowerCase();
+                                      let iconUrl = '';
+                                      if (ext === 'pdf') {
+                                        iconUrl = '/icons/pdf.svg';
+                                      } else if (ext === 'docx' || ext === 'doc') {
+                                        iconUrl = '/icons/word.svg';
+                                      }
+                                      return (
+                                        <span
+                                          className={"px-1.5 py-0.5 rounded border font-medium inline-block align-middle break-all whitespace-normal leading-normal text-[9px] " + (
+                                            isManual
+                                              ? 'bg-stone-100 text-stone-500 border-stone-200'
+                                              : 'bg-warm-sand/50 text-olive-gray border-border-cream/80'
+                                          )}
+                                          title={fileName}
+                                        >
+                                          {iconUrl ? (
+                                            <img
+                                              src={iconUrl}
+                                              alt={ext}
+                                              className="w-3.5 h-3.5 inline-block align-middle mr-1.5 object-contain"
+                                            />
+                                          ) : (
+                                            <span className="inline-block align-middle mr-1">📄</span>
+                                          )}
+                                          <span className="align-middle">{displayName}</span>
+                                        </span>
+                                      );
+                                    })()}
+                                    {(() => {
+                                      const hasMd5 = !!issue._fileMd5;
+                                      if (!hasMd5) return null;
+                                      const rawPage = issue._page;
+                                      const displayPage = rawPage ? ("P. " + rawPage) : 'P. 1';
+                                      return (
+                                        <span className="bg-orange-50 text-orange-700 border border-orange-200/60 px-2 py-0.5 rounded font-bold w-max text-[9px] inline-block mt-0.5 shadow-2xs">
+                                          {displayPage}
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
+                                </td>
 
                                 {fields.map((f, colIndex) => {
                                   const key = f.key || `field_${colIndex + 1}`;
