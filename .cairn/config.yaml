@@ -1,0 +1,16 @@
+version: 0.1
+project:
+  name: "DocEx"
+  summary: "智能结构化文档数据提取"
+cairn:
+  knowledge_dir: "cairn"
+  skill_spec_date: "2026-08-07"
+  git_policy: "private_sync"
+  language: "zh"
+graduation:
+  provider: "obsidian"
+  vault: "DevCairn"
+  target: "docex"
+  index: "docex/INDEX.md"
+history:
+  migration_mode: "start_fresh"

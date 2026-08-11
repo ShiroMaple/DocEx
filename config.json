@@ -23,8 +23,18 @@
         "name": "默认配置",
         "provider": "Kimi",
         "baseUrl": "https://api.moonshot.cn/v1",
-        "model": "kimi-k2.6",
+        "model": "kimi-k2.7-code",
+        "thinkingEffort": "medium",
         "isDefault": true
+      },
+      {
+        "id": "default-highspeed",
+        "name": "高速配置",
+        "provider": "Kimi",
+        "baseUrl": "https://api.moonshot.cn/v1",
+        "model": "kimi-k2.7-code-highspeed",
+        "thinkingEffort": "medium",
+        "isDefault": false
       }
     ]
   },
@@ -45,7 +55,7 @@
         "baseUrl": "https://cli-aac44e92a2b89bd5.feishu.cn/base/",
         "appToken": "FJvNwbnCxi6ymuky8bTcRTu2nS6",
         "tableId": "tbla78TDmVdUqIyt",
-        "isDefault": true
+        "isDefault": false
       },
       {
         "id": "wps_hse",

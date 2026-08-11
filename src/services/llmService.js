@@ -379,3 +379,267 @@ export async function extractSafetyIssues(multimodalData) {
     }
   });
 }
+
+/**
+ * 异步生成器：流式多模态文档提取服务
+ * @param {object|Array} multimodalData - 预处理后的多模态对象 { text, images } 或交织数组
+ * @param {object} params - 动态参数
+ * @param {string} params.systemPrompt - 系统引导词
+ * @param {string} params.userPrompt - 用户指令词
+ * @param {Array<object>} params.fields - 目标提取字段定义
+ * @param {object} params.llmConfig - 大模型连接配置
+ * @returns {AsyncGenerator<object>}
+ */
+export async function* extractCustomFieldsStream(multimodalData, { systemPrompt, userPrompt, fields, llmConfig }) {
+  const apiKey = llmConfig.apiKey || config.openai.apiKey;
+  const baseUrl = llmConfig.baseUrl || config.openai.baseUrl;
+  const model = llmConfig.model || config.openai.model;
+  const thinkingEffort = (llmConfig.thinkingEffort || 'low').toLowerCase();
+
+  if (!apiKey) {
+    throw new Error('未配置 API Key，无法调用大模型服务');
+  }
+
+  const openai = new OpenAI({
+    apiKey: apiKey,
+    baseURL: baseUrl
+  });
+
+  const properties = {};
+  const required = [];
+  fields.forEach(f => {
+    properties[f.key] = {
+      type: 'string',
+      description: `${f.desc}${f.example ? `（示例：${f.example}）` : ''}`
+    };
+    required.push(f.key);
+  });
+
+  const jsonSchema = {
+    type: 'object',
+    properties: {
+      results: {
+        type: 'array',
+        description: '从文档中提取的结构化隐患或数据列表',
+        items: {
+          type: 'object',
+          properties: properties,
+          required: required,
+          additionalProperties: false
+        }
+      }
+    },
+    required: ['results'],
+    additionalProperties: false
+  };
+
+  const contentArray = [];
+  contentArray.push({ type: 'text', text: userPrompt || '请分析以下文档内容并提取结构化字段：' });
+  const isPdf = multimodalData && !Array.isArray(multimodalData) && ('text' in multimodalData || 'images' in multimodalData);
+  const supportVision = llmConfig.supportVision !== false;
+
+  if (isPdf) {
+    if (multimodalData.text && multimodalData.text.trim().length > 0) {
+      contentArray.push({
+        type: 'text',
+        text: `【PDF 原始文档的文字参考层】:\n\`\`\`\n${multimodalData.text}\n\`\`\``
+      });
+    } else {
+      contentArray.push({
+        type: 'text',
+        text: `【PDF 原始文档的文字参考层】: (未提取到电子文本，请完全依据视觉截图进行 OCR 理解)`
+      });
+    }
+    if (supportVision && multimodalData.images && multimodalData.images.length > 0) {
+      contentArray.push({
+        type: 'text',
+        text: `【PDF 报告的逐页视觉截图】:`
+      });
+      for (const img of multimodalData.images) {
+        contentArray.push({
+          type: 'image_url',
+          image_url: {
+            url: `data:${img.mimeType};base64,${img.data}`
+          }
+        });
+      }
+    }
+  } else if (Array.isArray(multimodalData)) {
+    for (const part of multimodalData) {
+      if (part.type === 'text') {
+        contentArray.push({ type: 'text', text: part.text });
+      } else if (part.type === 'image' && supportVision) {
+        contentArray.push({
+          type: 'image_url',
+          image_url: {
+            url: `data:${part.mimeType};base64,${part.data}`
+          }
+        });
+      }
+    }
+  }
+
+  const keyInstructions = `\n\n【关键规范】：返回的 JSON 数组中，每一个对象必须严格且只能使用以下指定的英文属性键名（Property Keys），严禁自定义或使用中文列名作为 JSON 的键名：\n${fields.map(f => `- "${f.key}": 对应“${f.label}”（${f.desc || ''}）`).join('\n')}`;
+  const enhancedSystemPrompt = `${systemPrompt}${keyInstructions}`;
+
+  const isKimi = llmConfig.provider === 'Kimi' || (baseUrl && baseUrl.includes('moonshot.cn'));
+  if (isKimi) {
+    try {
+      logger.info({ event: 'KIMI_TOKEN_ESTIMATION_START', model }, '⏳ 正在调用 Kimi 精准 Token 估计 API...');
+      const estimateRes = await fetch(`${baseUrl}/tokenizers/estimate-token-count`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            { role: 'system', content: enhancedSystemPrompt },
+            { role: 'user', content: contentArray }
+          ]
+        })
+      });
+      if (estimateRes.ok) {
+        const estData = await estimateRes.json();
+        const totalTokens = estData.data?.total_tokens;
+        if (typeof totalTokens === 'number') {
+          logger.info({ event: 'KIMI_TOKEN_ESTIMATION_SUCCESS', totalTokens }, `🎯 Kimi 精准估算输入 Token 数为: ${totalTokens}`);
+          yield { type: 'estimated', promptTokens: totalTokens };
+        }
+      } else {
+        const errTxt = await estimateRes.text().catch(() => '');
+        logger.warn({ event: 'KIMI_TOKEN_ESTIMATION_FAILED', status: estimateRes.status, error: errTxt }, 'Kimi Token 精准估算接口返回非 OK');
+      }
+    } catch (estErr) {
+      logger.warn({ event: 'KIMI_TOKEN_ESTIMATION_EXCEPTION', error: estErr.message }, '调用 Kimi Token 估计接口发生异常');
+    }
+  }
+
+  try {
+    logger.info({
+      event: 'LLM_STRUCTURED_OUTPUTS_START',
+      model,
+      thinkingEffort
+    }, `⏳ 正在尝试使用 Structured Outputs (json_schema) 模式，思考强度: ${thinkingEffort}...`);
+
+    const options = {
+      model: model,
+      messages: [
+        { role: 'system', content: enhancedSystemPrompt },
+        { role: 'user', content: contentArray }
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'document_extractor',
+          strict: true,
+          schema: jsonSchema
+        }
+      },
+      reasoning_effort: thinkingEffort,
+      stream: true,
+      stream_options: { include_usage: true }
+    };
+
+    const response = await openai.chat.completions.create(options);
+
+    let rawContent = '';
+    let usage = null;
+
+    for await (const chunk of response) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        rawContent += content;
+        yield { type: 'chunk', text: content };
+      }
+      if (chunk.usage) {
+        usage = {
+          promptTokens: chunk.usage.prompt_tokens,
+          completionTokens: chunk.usage.completion_tokens,
+          totalTokens: chunk.usage.total_tokens
+        };
+      }
+    }
+
+    const jsonStr = extractJsonBlock(rawContent) || rawContent;
+    const parsed = JSON.parse(jsonStr);
+    const results = parsed.results || [];
+    const translated = translateResultKeys(results, fields);
+
+    yield {
+      type: 'done',
+      data: translated,
+      raw: rawContent,
+      usage: usage
+    };
+
+  } catch (parseError) {
+    logger.warn({
+      event: 'LLM_JSON_MODE_FALLBACK',
+      model,
+      error: parseError.message
+    }, '⚠️ completions.create (json_schema) 失败或不支持，自动降级为 JSON Mode 兼容提取');
+
+    const fallbackSystemPrompt = `${enhancedSystemPrompt}\n\n【关键规范】：你必须且只能返回一个合法的 JSON 格式，顶级键名必须为 "results"，其值是一个数组。不要包含 markdown 格式标记，直接输出 JSON 文本。
+每个对象必须包含以下字段: ${JSON.stringify(required)}。若字段在文中未提及，设为空字符串 ""。`;
+
+    let response;
+    try {
+      const options = {
+        model: model,
+        messages: [
+          { role: 'system', content: fallbackSystemPrompt },
+          { role: 'user', content: contentArray }
+        ],
+        response_format: { type: 'json_object' },
+        reasoning_effort: thinkingEffort,
+        stream: true,
+        stream_options: { include_usage: true }
+      };
+      response = await openai.chat.completions.create(options);
+    } catch (apiErr) {
+      logger.error({
+        event: 'LLM_API_ERROR',
+        model,
+        error: { message: apiErr.message, stack: apiErr.stack }
+      }, '大模型 API 调用彻底失败');
+      throw apiErr;
+    }
+
+    let rawContent = '';
+    let usage = null;
+
+    for await (const chunk of response) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        rawContent += content;
+        yield { type: 'chunk', text: content };
+      }
+      if (chunk.usage) {
+        usage = {
+          promptTokens: chunk.usage.prompt_tokens,
+          completionTokens: chunk.usage.completion_tokens,
+          totalTokens: chunk.usage.total_tokens
+        };
+      }
+    }
+
+    let cleanedRaw = rawContent.trim();
+    if (cleanedRaw.startsWith('```')) {
+      cleanedRaw = cleanedRaw.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
+    }
+
+    const jsonStr = extractJsonBlock(cleanedRaw) || cleanedRaw;
+    const parsed = JSON.parse(jsonStr);
+    const results = parsed.results || [];
+    const translated = translateResultKeys(results, fields);
+
+    yield {
+      type: 'done',
+      data: translated,
+      raw: rawContent,
+      usage: usage
+    };
+  }
+}

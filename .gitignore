@@ -24,3 +24,7 @@ data/input/*
 
 # PDFJS worker build artifact
 public/pdf.worker.mjs
+
+# Added by cairn init (policy: private_sync)
+cairn/
+

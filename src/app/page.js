@@ -100,7 +100,8 @@ export default function DocumentExtractor({ presetId = null }) {
     provider: '',
     baseUrl: '',
     model: '',
-    apiKey: ''
+    apiKey: '',
+    thinkingEffort: ''
   });
   const [llmConnected, setLlmConnected] = useState(false);
   const [llmSupportVision, setLlmSupportVision] = useState(false);
@@ -133,6 +134,10 @@ export default function DocumentExtractor({ presetId = null }) {
   const [fileStatusMap, setFileStatusMap] = useState({}); // { [md5]: 'pending' | 'processing' | 'success' | 'error' }
   const [extractionError, setExtractionError] = useState('');
   const [extractedIssues, setExtractedIssues] = useState([]);
+  const [fileFilteredCountMap, setFileFilteredCountMap] = useState({});
+  const totalFilteredCount = Object.values(fileFilteredCountMap).reduce((sum, count) => sum + count, 0);
+  const [fileEstPromptTokensMap, setFileEstPromptTokensMap] = useState({});
+  const [elapsedTime, setElapsedTime] = useState(null);
   const [tokenUsage, setTokenUsage] = useState(null);
   const [validationErrors, setValidationErrors] = useState({}); // { rowIndex_fieldKey: errorText }
   const [isPushing, setIsPushing] = useState(false);
@@ -252,7 +257,8 @@ export default function DocumentExtractor({ presetId = null }) {
           provider: activeConfig.provider,
           baseUrl: activeConfig.baseUrl,
           model: activeConfig.model,
-          apiKey: activeConfig.apiKey
+          apiKey: activeConfig.apiKey,
+          thinkingEffort: activeConfig.thinkingEffort || ''
         });
         setSelectedConfigId(activeConfig.id);
         setCustomConfigName(activeConfig.isDefault ? '' : activeConfig.name);
@@ -672,7 +678,8 @@ export default function DocumentExtractor({ presetId = null }) {
           provider: selected.provider,
           baseUrl: selected.baseUrl,
           model: selected.model,
-          apiKey: selected.apiKey
+          apiKey: selected.apiKey,
+          thinkingEffort: selected.thinkingEffort || ''
         });
         setCustomConfigName(selected.isDefault ? '' : selected.name);
       }
@@ -694,7 +701,8 @@ export default function DocumentExtractor({ presetId = null }) {
         provider: defaultLLMConf.provider,
         baseUrl: defaultLLMConf.baseUrl,
         model: defaultLLMConf.model,
-        apiKey: defaultLLMConf.apiKey
+        apiKey: defaultLLMConf.apiKey,
+        thinkingEffort: defaultLLMConf.thinkingEffort || ''
       });
       setCustomConfigName('');
       localStorage.setItem('docex_active_llm_config_id', 'default');
@@ -982,6 +990,9 @@ export default function DocumentExtractor({ presetId = null }) {
 
     setExtractionError('');
     setExtractedIssues([]);
+    setFileFilteredCountMap({});
+    setFileEstPromptTokensMap({});
+    setElapsedTime(null);
     setTokenUsage({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
     setPushResult(null);
     setRawLlmResponse('');
@@ -1030,17 +1041,32 @@ export default function DocumentExtractor({ presetId = null }) {
     let totalPromptTokens = 0;
     let totalCompletionTokens = 0;
     let totalTotalTokens = 0;
-    let combinedRawContent = "";
     let finalError = null;
+
+    const batchStartTime = Date.now();
 
     for (let i = 0; i < readyFiles.length; i++) {
       const file = readyFiles[i];
-      setFileStatusMap(prev => ({ ...prev, [file.md5]: 'processing' }));
+      setFileStatusMap(prev => Object.assign({}, prev, { [file.md5]: 'processing' }));
       setExtractingProgress({
         percent: Math.round((i / readyFiles.length) * 100),
         currentFile: file.fileName,
         currentIndex: i + 1,
         totalFiles: readyFiles.length
+      });
+
+      // 步骤 1：本地输入 Token 粗估
+      const estPromptTokens = Math.max(1000, Math.round((file.size || 0) * 0.4));
+      setFileEstPromptTokensMap(prev => {
+        const updated = Object.assign({}, prev, { [file.md5]: estPromptTokens });
+        return updated;
+      });
+      totalPromptTokens += estPromptTokens;
+      totalTotalTokens += estPromptTokens;
+      setTokenUsage({
+        promptTokens: totalPromptTokens,
+        completionTokens: totalCompletionTokens,
+        totalTokens: totalTotalTokens
       });
 
       try {
@@ -1056,52 +1082,150 @@ export default function DocumentExtractor({ presetId = null }) {
             postFilters: preset?.postFilters
           })
         });
-        const data = await res.json();
-
-        // Incrementally update token usage state
-        if (data.tokenUsage) {
-          totalPromptTokens += data.tokenUsage.promptTokens || 0;
-          totalCompletionTokens += data.tokenUsage.completionTokens || 0;
-          totalTotalTokens += data.tokenUsage.totalTokens || 0;
-
-          setTokenUsage({
-            promptTokens: totalPromptTokens,
-            completionTokens: totalCompletionTokens,
-            totalTokens: totalTotalTokens
-          });
-        }
-
-        // Incrementally update raw text response
-        if (data.raw) {
-          combinedRawContent += `\n/* === 文件: ${file.fileName} (${file.md5}) === */\n${data.raw}\n`;
-          setRawLlmResponse(combinedRawContent.trim());
-        }
 
         if (!res.ok) {
-          throw new Error(`[文件 ${file.fileName}] ${data.error || '解析模型提取失败'}`);
+          const errText = await res.text().catch(() => '');
+          throw new Error("请求失败: " + (errText || res.statusText));
         }
 
-        const rawItems = data.data || [];
-        // Filter out empty items
-        const filtered = rawItems.filter(item => {
-          return Object.values(item).some(val => val && val.toString().trim() !== '');
-        }).map(item => ({
-          ...item,
-          _fileMd5: file.md5
-        }));
+        // 步骤 2：流式响应读取
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fileRawContent = '';
+        let fileDoneResult = null;
+        let lastEstCompletion = 0;
 
-        // Dynamic streaming append to table
-        setExtractedIssues(prev => [...prev, ...filtered]);
-        allExtractedIssues = [...allExtractedIssues, ...filtered];
-        setFileStatusMap(prev => ({ ...prev, [file.md5]: 'success' }));
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const lineStr of lines) {
+            if (!lineStr.trim()) continue;
+            try {
+              const line = JSON.parse(lineStr);
+              if (line.type === 'chunk') {
+                fileRawContent += line.text;
+                setRawLlmResponse(prev => {
+                  const header = "/* === 文件: " + file.fileName + " (" + file.md5 + ") === */";
+                  let cleaned = prev || '';
+                  const idx = cleaned.indexOf(header);
+                  if (idx !== -1) {
+                    const nextIdx = cleaned.indexOf('/* === 文件:', idx + header.length);
+                    if (nextIdx !== -1) {
+                      cleaned = cleaned.slice(0, idx) + cleaned.slice(nextIdx);
+                    } else {
+                      cleaned = cleaned.slice(0, idx);
+                    }
+                  }
+                  return (cleaned.trim() + "\n\n" + header + "\n" + fileRawContent).trim();
+                });
+
+                // 输出 Token 随字数增长动态计算逻辑
+                const estCompletion = Math.round(fileRawContent.length * 1.3);
+                const diffCompletion = estCompletion - lastEstCompletion;
+                lastEstCompletion = estCompletion;
+
+                totalCompletionTokens += diffCompletion;
+                totalTotalTokens += diffCompletion;
+                setTokenUsage({
+                  promptTokens: totalPromptTokens,
+                  completionTokens: totalCompletionTokens,
+                  totalTokens: totalTotalTokens
+                });
+
+              } else if (line.type === 'estimated') {
+                // 精准估算输入 Token 并实时覆盖更新
+                const realEst = line.promptTokens || 0;
+                setFileEstPromptTokensMap(prev => {
+                  const oldEstForThisFile = prev[file.md5] || estPromptTokens;
+                  totalPromptTokens = totalPromptTokens - oldEstForThisFile + realEst;
+                  totalTotalTokens = totalTotalTokens - oldEstForThisFile + realEst;
+                  setTokenUsage(tu => {
+                    const currentPrompt = totalPromptTokens;
+                    const currentComp = tu ? (tu.completionTokens || 0) : 0;
+                    return {
+                      promptTokens: currentPrompt,
+                      completionTokens: currentComp,
+                      totalTokens: currentPrompt + currentComp
+                    };
+                  });
+                  const updated = Object.assign({}, prev, { [file.md5]: realEst });
+                  return updated;
+                });
+
+              } else if (line.type === 'done') {
+                fileDoneResult = line;
+              } else if (line.type === 'error') {
+                throw new Error(line.error);
+              }
+            } catch (e) {
+              console.error('流解析帧出错:', e);
+            }
+          }
+        }
+
+        if (fileDoneResult) {
+          const realPrompt = fileDoneResult.tokenUsage?.promptTokens || 0;
+          const realCompletion = fileDoneResult.tokenUsage?.completionTokens || 0;
+          const realTotal = fileDoneResult.tokenUsage?.totalTokens || 0;
+
+          // 纠偏 Token
+          setFileEstPromptTokensMap(prev => {
+            const currentEstPrompt = prev[file.md5] || estPromptTokens;
+            totalPromptTokens = totalPromptTokens - currentEstPrompt + realPrompt;
+            totalCompletionTokens = totalCompletionTokens - lastEstCompletion + realCompletion;
+            totalTotalTokens = totalTotalTokens - currentEstPrompt - lastEstCompletion + realTotal;
+
+            setTokenUsage({
+              promptTokens: totalPromptTokens,
+              completionTokens: totalCompletionTokens,
+              totalTokens: totalTotalTokens
+            });
+            const updated = Object.assign({}, prev, { [file.md5]: realPrompt });
+            return updated;
+          });
+
+          const rawItems = fileDoneResult.data || [];
+          const filtered = rawItems.filter(item => {
+            return Object.values(item).some(val => val && val.toString().trim() !== '');
+          }).map(item => ({
+            ...item,
+            _fileMd5: file.md5
+          }));
+
+          setExtractedIssues(prev => [...prev, ...filtered]);
+          allExtractedIssues = [...allExtractedIssues, ...filtered];
+          setFileStatusMap(prev => {
+            const updated = Object.assign({}, prev, { [file.md5]: 'success' });
+            return updated;
+          });
+          setFileFilteredCountMap(prev => {
+            const updated = Object.assign({}, prev, { [file.md5]: fileDoneResult.filteredCount || 0 });
+            return updated;
+          });
+        } else {
+          throw new Error('未获取到流式完成消息，数据可能不完整');
+        }
 
       } catch (err) {
-        console.error(`解析文件 ${file.fileName} 失败:`, err);
+        console.error("解析文件 " + file.fileName + " 失败:", err);
         finalError = err.message;
-        setFileStatusMap(prev => ({ ...prev, [file.md5]: 'error' }));
+        setFileStatusMap(prev => {
+          const updated = Object.assign({}, prev, { [file.md5]: 'error' });
+          return updated;
+        });
         break;
       }
     }
+
+    const batchEndTime = Date.now();
+    const elapsed = (batchEndTime - batchStartTime) / 1000;
+    setElapsedTime(elapsed);
 
     setIsExtracting(false);
 
@@ -1148,9 +1272,14 @@ export default function DocumentExtractor({ presetId = null }) {
 
     // Clear old issues for this specific file
     setExtractedIssues(prev => prev.filter(item => item._fileMd5 !== file.md5));
+    setFileFilteredCountMap(prev => {
+      const updated = { ...prev };
+      delete updated[file.md5];
+      return updated;
+    });
 
     // Update status mapping for the file
-    setFileStatusMap(prev => ({ ...prev, [file.md5]: 'processing' }));
+    setFileStatusMap(prev => Object.assign({}, prev, { [file.md5]: 'processing' }));
 
     const readyFiles = filesQueue.filter(f => f.status === 'done');
     const fileIdx = readyFiles.findIndex(f => f.md5 === file.md5);
@@ -1168,6 +1297,25 @@ export default function DocumentExtractor({ presetId = null }) {
       example: f.example || ''
     }));
 
+    const singleStartTime = Date.now();
+
+    // 步骤 1：预估输入 Token 并累加展示
+    const estPromptTokens = Math.max(1000, Math.round((file.size || 0) * 0.4));
+    setFileEstPromptTokensMap(prev => {
+      const updated = Object.assign({}, prev, { [file.md5]: estPromptTokens });
+      return updated;
+    });
+    setTokenUsage(prev => {
+      const oldPrompt = prev?.promptTokens || 0;
+      const oldCompletion = prev?.completionTokens || 0;
+      const oldTotal = prev?.totalTokens || 0;
+      return {
+        promptTokens: oldPrompt + estPromptTokens,
+        completionTokens: oldCompletion,
+        totalTokens: oldTotal + estPromptTokens
+      };
+    });
+
     try {
       const res = await fetch('/api/extract', {
         method: 'POST',
@@ -1181,56 +1329,135 @@ export default function DocumentExtractor({ presetId = null }) {
           postFilters: preset?.postFilters
         })
       });
-      const data = await res.json();
 
-      // Accumulate tokens
-      if (data.tokenUsage) {
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        throw new Error(errText || res.statusText);
+      }
+
+      // 步骤 2：流式响应读取
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fileRawContent = '';
+      let fileDoneResult = null;
+      let lastEstCompletion = 0;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const lineStr of lines) {
+          if (!lineStr.trim()) continue;
+          try {
+            const line = JSON.parse(lineStr);
+            if (line.type === 'chunk') {
+              fileRawContent += line.text;
+              setRawLlmResponse(prev => {
+                const header = "/* === 文件: " + file.fileName + " (" + file.md5 + ") === */";
+                let cleaned = prev || '';
+                const idx = cleaned.indexOf(header);
+                if (idx !== -1) {
+                  const nextIdx = cleaned.indexOf('/* === 文件:', idx + header.length);
+                  if (nextIdx !== -1) {
+                    cleaned = cleaned.slice(0, idx) + cleaned.slice(nextIdx);
+                  } else {
+                    cleaned = cleaned.slice(0, idx);
+                  }
+                }
+                return (cleaned.trim() + "\n\n" + header + "\n" + fileRawContent).trim();
+              });
+
+              // 输出 Token随字数增长动态计算逻辑
+              const estCompletion = Math.round(fileRawContent.length * 1.3);
+              const diffCompletion = estCompletion - lastEstCompletion;
+              lastEstCompletion = estCompletion;
+
+              setTokenUsage(prev => {
+                const oldPrompt = prev?.promptTokens || 0;
+                const oldCompletion = prev?.completionTokens || 0;
+                const oldTotal = prev?.totalTokens || 0;
+                return {
+                  promptTokens: oldPrompt,
+                  completionTokens: oldCompletion + diffCompletion,
+                  totalTokens: oldTotal + diffCompletion
+                };
+              });
+
+            } else if (line.type === 'estimated') {
+              // 精准估算输入 Token 并实时覆盖更新
+              const realEst = line.promptTokens || 0;
+              setFileEstPromptTokensMap(prev => {
+                const oldEstForThisFile = prev[file.md5] || estPromptTokens;
+                setTokenUsage(tu => {
+                  const oldPrompt = tu?.promptTokens || 0;
+                  const oldCompletion = tu?.completionTokens || 0;
+                  return {
+                    promptTokens: oldPrompt - oldEstForThisFile + realEst,
+                    completionTokens: oldCompletion,
+                    totalTokens: oldPrompt - oldEstForThisFile + realEst + oldCompletion
+                  };
+                });
+                const updated = Object.assign({}, prev, { [file.md5]: realEst });
+                return updated;
+              });
+
+            } else if (line.type === 'done') {
+              fileDoneResult = line;
+            } else if (line.type === 'error') {
+              throw new Error(line.error);
+            }
+          } catch (e) {
+            console.error('流解析帧出错:', e);
+          }
+        }
+      }
+
+      if (fileDoneResult) {
+        const realPrompt = fileDoneResult.tokenUsage?.promptTokens || 0;
+        const realCompletion = fileDoneResult.tokenUsage?.completionTokens || 0;
+        const realTotal = fileDoneResult.tokenUsage?.totalTokens || 0;
+
+        // 纠偏 Token
         setTokenUsage(prev => {
           const oldPrompt = prev?.promptTokens || 0;
           const oldCompletion = prev?.completionTokens || 0;
-          const oldTotal = prev?.totalTokens || 0;
           return {
-            promptTokens: oldPrompt + (data.tokenUsage.promptTokens || 0),
-            completionTokens: oldCompletion + (data.tokenUsage.completionTokens || 0),
-            totalTokens: oldTotal + (data.tokenUsage.totalTokens || 0)
+            promptTokens: oldPrompt - estPromptTokens + realPrompt,
+            completionTokens: oldCompletion - lastEstCompletion + realCompletion,
+            totalTokens: oldPrompt - estPromptTokens + realPrompt + oldCompletion - lastEstCompletion + realCompletion
           };
         });
-      }
 
-      // Update raw text response
-      if (data.raw) {
-        setRawLlmResponse(prev => {
-          const header = `/* === 文件: ${file.fileName} (${file.md5}) === */`;
-          let cleaned = prev || '';
-          const idx = cleaned.indexOf(header);
-          if (idx !== -1) {
-            const nextIdx = cleaned.indexOf('/* === 文件:', idx + header.length);
-            if (nextIdx !== -1) {
-              cleaned = cleaned.slice(0, idx) + cleaned.slice(nextIdx);
-            } else {
-              cleaned = cleaned.slice(0, idx);
-            }
-          }
-          return (cleaned.trim() + `\n\n${header}\n${data.raw}`).trim();
+        const rawItems = fileDoneResult.data || [];
+        const filtered = rawItems.filter(item => {
+          return Object.values(item).some(val => val && val.toString().trim() !== '');
+        }).map(item => ({
+          ...item,
+          _fileMd5: file.md5
+        }));
+
+        // Append new issues
+        setExtractedIssues(prev => [...prev, ...filtered]);
+        setFileStatusMap(prev => {
+          const updated = Object.assign({}, prev, { [file.md5]: 'success' });
+          return updated;
         });
+        setFileFilteredCountMap(prev => {
+          const updated = Object.assign({}, prev, { [file.md5]: fileDoneResult.filteredCount || 0 });
+          return updated;
+        });
+
+        const singleEndTime = Date.now();
+        setElapsedTime((singleEndTime - singleStartTime) / 1000);
+        showToast("文档 [" + file.fileName + "] 重新解析成功！");
+      } else {
+        throw new Error('未获取到流式完成消息，数据可能不完整');
       }
-
-      if (!res.ok) {
-        throw new Error(data.error || '解析模型提取失败');
-      }
-
-      const rawItems = data.data || [];
-      const filtered = rawItems.filter(item => {
-        return Object.values(item).some(val => val && val.toString().trim() !== '');
-      }).map(item => ({
-        ...item,
-        _fileMd5: file.md5
-      }));
-
-      // Append new issues
-      setExtractedIssues(prev => [...prev, ...filtered]);
-      setFileStatusMap(prev => ({ ...prev, [file.md5]: 'success' }));
-      showToast(`文档 [${file.fileName}] 重新解析成功！`);
 
     } catch (err) {
       console.error(`重新解析文件 ${file.fileName} 失败:`, err);
@@ -2458,6 +2685,18 @@ export default function DocumentExtractor({ presetId = null }) {
                   </div>
                 )}
 
+                {isExtracting && rawLlmResponse && (
+                  <div className="border border-border-cream rounded-lg bg-parchment p-4 mb-6 shadow-inner animate-fade-in">
+                    <p className="text-xs font-bold text-olive-gray mb-2 flex items-center gap-1.5 animate-pulse">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-terracotta animate-ping" />
+                      <span>🤖 大模型实时解析输出中...</span>
+                    </p>
+                    <pre className="text-[11px] font-mono text-near-black overflow-auto max-h-72 p-3 bg-white rounded border border-border-cream whitespace-pre-wrap break-words leading-relaxed">
+                      {rawLlmResponse}
+                    </pre>
+                  </div>
+                )}
+
                 {/* Local validation warning / LLM error response */}
                 {extractionError && (
                   <div className="border border-red-200 bg-red-50/50 rounded-lg p-5 flex gap-3 text-xs text-error-crimson mb-6">
@@ -2506,16 +2745,24 @@ export default function DocumentExtractor({ presetId = null }) {
                           <span>📊 AI模型开销统计:</span>
                         </div>
                         <div>
-                          输入 Token <span className="text-near-black font-bold">{tokenUsage.promptTokens?.toLocaleString()}</span>
+                          输入 Tokens <span className="text-near-black font-bold">{tokenUsage.promptTokens?.toLocaleString()}</span>
                         </div>
                         <div className="w-px h-3 bg-border-warm" />
                         <div>
-                          输出 Token <span className="text-near-black font-bold">{tokenUsage.completionTokens?.toLocaleString()}</span>
+                          输出 Tokens <span className="text-near-black font-bold">{tokenUsage.completionTokens?.toLocaleString()}</span>
                         </div>
                         <div className="w-px h-3 bg-border-warm" />
                         <div>
-                          共计 Token <span className="text-near-black font-bold">{tokenUsage.totalTokens?.toLocaleString()}</span>
+                          共计 Tokens <span className="text-near-black font-bold">{tokenUsage.totalTokens?.toLocaleString()}</span>
                         </div>
+                        {elapsedTime !== null && (
+                          <>
+                            <div className="w-px h-3 bg-border-warm" />
+                            <div>
+                              总耗时 <span className="text-near-black font-bold">{elapsedTime.toFixed(1)}</span> 秒
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
 

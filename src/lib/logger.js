@@ -66,8 +66,21 @@ export const logger = pino({
         }
       }
     : {
-        target: 'pino-pretty',
-        options: { colorize: true }
+        targets: [
+          {
+            target: 'pino-pretty',
+            options: { colorize: true }
+          },
+          {
+            target: 'pino-roll',
+            options: {
+              file: './logs/docex',
+              frequency: 'daily',
+              size: '10m',
+              mkdir: true
+            }
+          }
+        ]
       }
 });
 

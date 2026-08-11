@@ -80,6 +80,7 @@ const defaultLLMList = rawLLMConfigs.map(c => {
     provider: c.provider || llmProvider,
     baseUrl: c.baseUrl || openai.baseUrl,
     model: c.model || openai.model,
+    thinkingEffort: c.thinkingEffort || 'low',
     apiKey,
     isDefault: Boolean(c.isDefault)
   };
@@ -91,6 +92,7 @@ const defaultLLMConf = defaultLLMList.find(c => c.isDefault) || {
   provider: 'XiaoMi',
   baseUrl: 'https://token-plan-cn.xiaomimimo.com/v1',
   model: 'mimo-v2.5',
+  thinkingEffort: 'low',
   apiKey: openai.apiKey,
   isDefault: true
 };

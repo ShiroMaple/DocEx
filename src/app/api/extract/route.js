@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getFileRecord } from '../../../lib/db.js';
-import { extractCustomFields } from '../../../services/llmService.js';
+import { extractCustomFieldsStream } from '../../../services/llmService.js';
 import { config } from '../../../config.js';
 import { checkRateLimit } from '../../../lib/rateLimit.js';
 import { withLogging, logger } from '../../../lib/logger.js';
@@ -187,69 +187,125 @@ async function extractHandler(request) {
     }
 
     // ── 调用大模型 ──
+    const startTime = Date.now();
     logger.info({
       event: 'LLM_EXTRACTION_START',
       file: { md5, name: record.fileName, type: ext },
       fieldsCount: fields.length
-    }, `🤖 [MD5: ${md5}] 提交大模型提取，字段数: ${fields.length}...`);
+    }, `🤖 [MD5: ${md5}] 提交大模型流式提取，字段数: ${fields.length}...`);
     
-    const { data, raw, usage } = await extractCustomFields(multimodalData, {
+    const generator = extractCustomFieldsStream(multimodalData, {
       systemPrompt,
       userPrompt,
       fields,
       llmConfig
     });
 
-    // ── 应用后置过滤引擎 (postFilters) ──
-    let filteredData = data;
-    if (postFilters && Array.isArray(postFilters) && postFilters.length > 0 && Array.isArray(data)) {
-      const originalCount = data.length;
-      const validResults = [];
-      const droppedResults = [];
-      
-      for (const record of data) {
-        let passed = true;
-        for (const filter of postFilters) {
-          if (filter.condition) {
-            try {
-              // 构造沙箱验证
-              const filterFn = new Function('record', filter.condition);
-              const result = filterFn(record);
-              if (!result) {
-                passed = false;
-                logger.info({ event: 'POST_FILTER_DROPPED', filterName: filter.name, record }, `记录被过滤引擎 [${filter.name}] 拦截`);
-                break;
-              }
-            } catch (err) {
-              logger.error({ event: 'POST_FILTER_ERROR', filterName: filter.name, error: err.message }, '执行后置过滤条件报错');
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (obj) => {
+          controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'));
+        };
+
+        try {
+          let doneResult = null;
+          for await (const message of generator) {
+            if (message.type === 'chunk') {
+              send({ type: 'chunk', text: message.text });
+            } else if (message.type === 'estimated') {
+              send({ type: 'estimated', promptTokens: message.promptTokens });
+            } else if (message.type === 'done') {
+              doneResult = message;
             }
           }
-        }
-        if (passed) validResults.push(record);
-        else droppedResults.push(record);
-      }
-      
-      filteredData = validResults;
-      logger.info({ event: 'POST_FILTER_COMPLETE', originalCount, finalCount: validResults.length, droppedCount: droppedResults.length }, '后置过滤引擎执行完毕');
-    }
 
-    return NextResponse.json({
-      success: true,
-      data: filteredData,
-      raw,
-      tokenUsage: usage
+          if (doneResult) {
+            const durationMs = Date.now() - startTime;
+            const data = doneResult.data;
+            
+            // ── 应用后置过滤引擎 (postFilters) ──
+            let filteredData = data;
+            let originalCount = Array.isArray(data) ? data.length : 0;
+            let filteredCount = 0;
+            if (postFilters && Array.isArray(postFilters) && postFilters.length > 0 && Array.isArray(data)) {
+              const validResults = [];
+              const droppedResults = [];
+              for (const record of data) {
+                let passed = true;
+                for (const filter of postFilters) {
+                  if (filter.condition) {
+                    try {
+                      const filterFn = new Function('record', filter.condition);
+                      const result = filterFn(record);
+                      if (!result) {
+                        passed = false;
+                        logger.info({ event: 'POST_FILTER_DROPPED', filterName: filter.name, record }, `记录被过滤引擎 [${filter.name}] 拦截`);
+                        break;
+                      }
+                    } catch (err) {
+                      logger.error({ event: 'POST_FILTER_ERROR', filterName: filter.name, error: err.message }, '执行后置过滤条件报错');
+                    }
+                  }
+                }
+                if (passed) validResults.push(record);
+                else droppedResults.push(record);
+              }
+              filteredData = validResults;
+              filteredCount = droppedResults.length;
+              logger.info({ event: 'POST_FILTER_COMPLETE', originalCount, finalCount: validResults.length, droppedCount: droppedResults.length }, '后置过滤引擎执行完毕');
+            }
+
+            logger.info({
+              event: 'LLM_EXTRACTION_SUCCESS',
+              model: llmConfig.model || config.openai.model,
+              durationMs,
+              metrics: {
+                promptTokens: doneResult.usage?.promptTokens,
+                completionTokens: doneResult.usage?.completionTokens,
+                totalTokens: doneResult.usage?.totalTokens,
+                recordsCount: filteredData.length,
+                filteredCount
+              }
+            }, `🎉 AI 文档结构化数据流式提取成功完成，总用时: ${durationMs}ms`);
+
+            send({
+              type: 'done',
+              data: filteredData,
+              raw: doneResult.raw,
+              tokenUsage: doneResult.usage,
+              originalCount,
+              filteredCount,
+              durationMs
+            });
+          } else {
+            throw new Error('大模型未返回有效的结构化数据');
+          }
+        } catch (err) {
+          logger.error({
+            event: 'EXTRACTION_HANDLER_EXCEPTION',
+            error: { message: err.message, stack: err.stack }
+          }, '提取过程发生异常');
+          send({ type: 'error', error: err.message });
+        } finally {
+          controller.close();
+        }
+      }
+    });
+
+    return new NextResponse(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Transfer-Encoding': 'chunked'
+      }
     });
 
   } catch (err) {
     logger.error({
-      event: 'EXTRACTION_HANDLER_EXCEPTION',
-      error: { message: err.message, stack: err.stack, rawContent: err.raw || null }
-    }, '提取失败');
-    return NextResponse.json({ 
-      error: err.message,
-      raw: err.raw || null,
-      tokenUsage: err.usage || null
-    }, { status: 500 });
+      event: 'EXTRACTION_HANDLER_PREFLIGHT_EXCEPTION',
+      error: { message: err.message, stack: err.stack }
+    }, '提取前置检查异常');
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
