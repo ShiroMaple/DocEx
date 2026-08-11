@@ -160,15 +160,20 @@ export default function DocumentExtractor({ presetId = null }) {
           if (p.fieldMapping) setFieldMappings(p.fieldMapping);
           if (p.platform) setPlatform(p.platform);
 
-          if (p.openai) {
+          if (p.llmConfig) {
             setLlmConfig({
-              provider: p.llmProvider || p.openai.provider || 'openai',
-              baseUrl: p.openai.baseUrl,
-              model: p.openai.model,
-              apiKey: p.openai.apiKey || ''
+              provider: p.llmConfig.provider || 'openai',
+              baseUrl: p.llmConfig.baseUrl,
+              model: p.llmConfig.model,
+              apiKey: p.llmConfig.hasApiKey ? '••••••••••••••••••••' : ''
             });
-            if (p.openai.apiKey) {
+            if (p.llmConfig.hasApiKey) {
               setLlmConnected(true);
+            }
+            // 联动大模型下拉框当前生效 ID，防止 UI 不同步
+            const match = configList.find(c => c.model === p.llmConfig.model && c.baseUrl === p.llmConfig.baseUrl);
+            if (match) {
+              setSelectedConfigId(match.id);
             }
           }
 
@@ -236,23 +241,20 @@ export default function DocumentExtractor({ presetId = null }) {
         const defaultFeishuConf = configData.defaultFeishuConf;
         const defaultUrls = configData.defaultUrls || {};
 
-        // 1. Load LLM Credentials
-        const cachedList = localStorage.getItem('docex_llm_config_list');
-        let loadedList = [];
-        if (cachedList) {
-          try { loadedList = JSON.parse(cachedList); } catch { }
-        }
-
-        const hasDefault = loadedList.some(c => c.id === 'default');
-        if (!hasDefault) {
-          loadedList = [defaultLLMConf, ...loadedList];
-        } else {
-          loadedList = loadedList.map(c => c.id === 'default' ? defaultLLMConf : c);
-        }
+        // 1. Load LLM Credentials from dynamic configuration
+        const loadedList = configData.defaultLLMList || [];
         setConfigList(loadedList);
 
-        const activeId = localStorage.getItem('docex_active_llm_config_id') || 'default';
-        const activeConfig = loadedList.find(c => c.id === activeId) || defaultLLMConf;
+        // 优先匹配当前 preset 锁定的模型，防止竞态条件干扰
+        let activeConfig = null;
+        if (preset && preset.llmConfig) {
+          activeConfig = loadedList.find(c => c.model === preset.llmConfig.model && c.baseUrl === preset.llmConfig.baseUrl);
+        }
+        if (!activeConfig) {
+          const activeId = localStorage.getItem('docex_active_llm_config_id') || 'default';
+          activeConfig = loadedList.find(c => c.id === activeId) || loadedList.find(c => c.isDefault) || loadedList[0] || defaultLLMConf;
+        }
+
         setLlmConfig({
           provider: activeConfig.provider,
           baseUrl: activeConfig.baseUrl,
@@ -261,7 +263,6 @@ export default function DocumentExtractor({ presetId = null }) {
           thinkingEffort: activeConfig.thinkingEffort || ''
         });
         setSelectedConfigId(activeConfig.id);
-        setCustomConfigName(activeConfig.isDefault ? '' : activeConfig.name);
 
         // 2. Load Table Configurations
         const serverTableConfigs = configData.parsedTableConfigs || [];
@@ -603,56 +604,8 @@ export default function DocumentExtractor({ presetId = null }) {
       setLlmConnected(true);
       setActiveModelLabel(data.model);
 
-      if (selectedConfigId === 'default') {
-        showToast('🎉 默认配置测试连接成功！');
-      } else {
-        let nameToUse = customConfigName.trim();
-        if (!nameToUse) {
-          const customConfigs = configList.filter(c => !c.isDefault);
-          const nextSeq = customConfigs.length + 1;
-          nameToUse = `自定义模型配置 ${nextSeq}`;
-        }
-
-        let updatedList = [];
-        let savedId = selectedConfigId;
-
-        if (selectedConfigId === 'new') {
-          const newId = `config_${Date.now()}`;
-          const newConfig = {
-            id: newId,
-            name: nameToUse,
-            provider: llmConfig.provider,
-            baseUrl: llmConfig.baseUrl,
-            model: llmConfig.model,
-            apiKey: llmConfig.apiKey,
-            isDefault: false
-          };
-          updatedList = [...configList, newConfig];
-          savedId = newId;
-        } else {
-          updatedList = configList.map(c => {
-            if (c.id === selectedConfigId) {
-              return {
-                ...c,
-                name: nameToUse,
-                provider: llmConfig.provider,
-                baseUrl: llmConfig.baseUrl,
-                model: llmConfig.model,
-                apiKey: llmConfig.apiKey
-              };
-            }
-            return c;
-          });
-        }
-
-        setConfigList(updatedList);
-        setSelectedConfigId(savedId);
-        setCustomConfigName(nameToUse);
-        localStorage.setItem('docex_llm_config_list', JSON.stringify(updatedList));
-        localStorage.setItem('docex_active_llm_config_id', savedId);
-        localStorage.setItem('docex_llm_config', JSON.stringify(llmConfig));
-        showToast(`🎉 配置 [${nameToUse}] 保存并测试连接成功！`);
-      }
+      // 只提供测试连通性，不提供保存
+      showToast(`🎉 模型 [${model}] 连接测试成功！`);
 
     } catch (err) {
       setLlmTestError(err.message);
@@ -663,26 +616,16 @@ export default function DocumentExtractor({ presetId = null }) {
 
   const handleConfigChange = (id) => {
     setSelectedConfigId(id);
-    if (id === 'new') {
+    localStorage.setItem('docex_active_llm_config_id', id);
+    const selected = configList.find(c => c.id === id);
+    if (selected) {
       setLlmConfig({
-        provider: 'openai',
-        baseUrl: 'https://api.openai.com/v1',
-        model: 'gpt-4o-mini',
-        apiKey: ''
+        provider: selected.provider,
+        baseUrl: selected.baseUrl,
+        model: selected.model,
+        apiKey: selected.apiKey,
+        thinkingEffort: selected.thinkingEffort || ''
       });
-      setCustomConfigName('');
-    } else {
-      const selected = configList.find(c => c.id === id);
-      if (selected) {
-        setLlmConfig({
-          provider: selected.provider,
-          baseUrl: selected.baseUrl,
-          model: selected.model,
-          apiKey: selected.apiKey,
-          thinkingEffort: selected.thinkingEffort || ''
-        });
-        setCustomConfigName(selected.isDefault ? '' : selected.name);
-      }
     }
   };
 
@@ -2052,34 +1995,9 @@ export default function DocumentExtractor({ presetId = null }) {
                                 {c.name} {c.isDefault ? '(默认)' : ''}
                               </option>
                             ))}
-                            <option value="new">➕ 新建自定义配置</option>
                           </select>
-                          {selectedConfigId !== 'default' && selectedConfigId !== 'new' && (
-                            <button
-                              onClick={() => handleDeleteConfig(selectedConfigId)}
-                              disabled={!canCustomModel}
-                              className="p-1.5 rounded border border-border-cream bg-white hover:bg-red-50 text-stone-gray hover:text-error-crimson transition disabled:opacity-50"
-                              title="删除该配置"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          )}
                         </div>
                       </div>
-
-                      {selectedConfigId !== 'default' && (
-                        <div className="flex flex-col gap-1">
-                          <label className="text-xs font-bold text-olive-gray uppercase tracking-wider">配置命名</label>
-                          <input
-                            type="text"
-                            value={customConfigName}
-                            onChange={(e) => setCustomConfigName(e.target.value)}
-                            disabled={!canCustomModel}
-                            className="bg-warm-sand border border-border-warm rounded px-3 py-1.5 text-xs outline-none focus:bg-ivory focus:border-focus-blue transition w-full disabled:opacity-60"
-                            placeholder="自定义模型配置名称"
-                          />
-                        </div>
-                      )}
 
                       <div className="flex flex-col gap-1">
                         <label className="text-xs font-bold text-olive-gray uppercase tracking-wider">Provider</label>
@@ -2129,11 +2047,11 @@ export default function DocumentExtractor({ presetId = null }) {
 
                     <button
                       onClick={verifyLlmConnection}
-                      disabled={isTestingLlm || !canCustomModel}
+                      disabled={isTestingLlm}
                       className="w-full bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold py-2 rounded transition flex items-center justify-center gap-1.5 disabled:opacity-50"
                     >
                       {isTestingLlm && <Loader2 size={12} className="animate-spin" />}
-                      {isTestingLlm ? '正在验证连接...' : '测试并保存配置'}
+                      {isTestingLlm ? '正在验证连接...' : '测试连接'}
                     </button>
 
                     {llmTestError && (
@@ -2810,9 +2728,8 @@ export default function DocumentExtractor({ presetId = null }) {
 
                     {/* Results grid */}
                     <div className="border border-border-cream rounded-lg bg-white shadow-sm max-h-[650px] overflow-auto">
-                      <div className="overflow-auto max-h-[650px]">
                         <table className="min-w-[1300px] w-full border-collapse text-left text-xs table-fixed">
-                          <thead className="sticky top-0 z-10 bg-parchment border-b border-border-cream shadow-[0_1px_0_0_#e8e6dc] [&_th:first-child]:rounded-tl-lg [&_th:last-child]:rounded-tr-lg">
+                          <thead className="bg-parchment border-b border-border-cream shadow-[0_1px_0_0_#e8e6dc] [&_th:first-child]:rounded-tl-lg [&_th:last-child]:rounded-tr-lg">
                             <tr>
                               <th className="p-3 font-bold text-near-black w-[50px] text-center whitespace-nowrap sticky left-0 top-0 z-40 bg-parchment border-r border-border-cream shadow-[0_1px_0_0_#e8e6dc]">#</th>
                               <th className="p-3 font-bold text-near-black w-[100px] text-left whitespace-nowrap sticky left-[50px] top-0 z-40 bg-parchment border-r-2 border-r-stone-200 shadow-[2px_1px_0_0_#e8e6dc] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">信息来源</th>
@@ -2923,7 +2840,6 @@ export default function DocumentExtractor({ presetId = null }) {
                           </tbody>
                         </table>
                       </div>
-                    </div>
 
                     {/* Push feedback results */}
                     {pushResult && (

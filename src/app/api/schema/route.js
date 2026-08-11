@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import wpsService from '../../../services/wpsService.js';
 import { getFeishuSchema } from '../../../services/feishuService.js';
 import { withLogging, logger } from '../../../lib/logger.js';
+import { readConfigFromDisk } from '../../../config/index.js';
 
 async function schemaHandler(request) {
   const { searchParams } = new URL(request.url);
@@ -11,8 +12,18 @@ async function schemaHandler(request) {
   try {
     if (provider === 'wps') {
       const fileId = searchParams.get('fileId')?.trim();
-      const appId = searchParams.get('appId')?.trim() || null;
-      const appSecret = searchParams.get('appSecret')?.trim() || null;
+      let appId = searchParams.get('appId')?.trim() || null;
+      let appSecret = searchParams.get('appSecret')?.trim() || null;
+      
+      // 掩码还原逻辑
+      if (appSecret === '••••••••••••••••••••') {
+        const diskConfig = readConfigFromDisk();
+        const match = diskConfig.parsedTableConfigs.find(c => c.appId === appId);
+        if (match && match.appSecret) {
+          appSecret = match.appSecret;
+        }
+      }
+
       if (!fileId) {
         return NextResponse.json({ error: '缺少 fileId 参数' }, { status: 400 });
       }
@@ -30,8 +41,18 @@ async function schemaHandler(request) {
     } else if (provider === 'feishu') {
       const appToken = searchParams.get('appToken')?.trim();
       const tableId = searchParams.get('tableId')?.trim();
-      const appId = searchParams.get('appId')?.trim() || null;
-      const appSecret = searchParams.get('appSecret')?.trim() || null;
+      let appId = searchParams.get('appId')?.trim() || null;
+      let appSecret = searchParams.get('appSecret')?.trim() || null;
+
+      // 掩码还原逻辑
+      if (appSecret === '••••••••••••••••••••') {
+        const diskConfig = readConfigFromDisk();
+        const match = diskConfig.parsedTableConfigs.find(c => c.appId === appId);
+        if (match && match.appSecret) {
+          appSecret = match.appSecret;
+        }
+      }
+
       if (!appToken || !tableId) {
         return NextResponse.json({ error: '缺少 appToken 或 tableId 参数' }, { status: 400 });
       }

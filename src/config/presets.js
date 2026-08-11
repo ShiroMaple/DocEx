@@ -175,8 +175,14 @@ export function getSafePresetForClient(id) {
       model: resolved.openai.model,
       hasApiKey: Boolean(resolved.openai.apiKey)
     },
-    wps: resolved.wps,
-    lark: resolved.lark,
+    wps: resolved.wps ? {
+      ...resolved.wps,
+      appSecret: resolved.wps.appSecret ? '••••••••••••••••••••' : ''
+    } : null,
+    lark: resolved.lark ? {
+      ...resolved.lark,
+      appSecret: resolved.lark.appSecret ? '••••••••••••••••••••' : ''
+    } : null,
     tableConfig: {
       platform: resolved.platform,
       url: resolved.platform === 'wps' ? resolved.wps.url : resolved.lark.url,

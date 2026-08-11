@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { getFileRecord } from '../../../lib/db.js';
 import { extractCustomFieldsStream } from '../../../services/llmService.js';
-import { config } from '../../../config.js';
+import { readConfigFromDisk } from '../../../config/index.js';
 import { checkRateLimit } from '../../../lib/rateLimit.js';
 import { withLogging, logger } from '../../../lib/logger.js';
 
@@ -71,7 +71,9 @@ function checkPromptSecurity(systemPrompt, userPrompt, fields) {
  */
 async function extractHandler(request) {
   try {
-    const { md5, systemPrompt, userPrompt, fields, llmConfig, postFilters } = await request.json();
+    const jsonBody = await request.json();
+    const { md5, systemPrompt, userPrompt, fields, postFilters } = jsonBody;
+    const llmConfig = jsonBody.llmConfig || {};
 
     if (!md5) {
       return NextResponse.json({ error: '缺少 md5 参数' }, { status: 400 });
@@ -80,7 +82,26 @@ async function extractHandler(request) {
       return NextResponse.json({ error: '必须指定待提取的字段' }, { status: 400 });
     }
 
-    const isDefaultKey = !llmConfig?.apiKey || llmConfig.apiKey === config.openai.apiKey;
+    // 掩码物理还原
+    let activeApiKey = llmConfig.apiKey || '';
+    const isMask = activeApiKey === '••••••••••••••••••••';
+    const diskConfig = readConfigFromDisk();
+
+    if (isMask) {
+      const match = diskConfig.defaultLLMList.find(c => c.model === llmConfig.model && c.baseUrl === llmConfig.baseUrl);
+      if (match && match.apiKey) {
+        activeApiKey = match.apiKey;
+      } else {
+        activeApiKey = diskConfig.defaultLLMConf.apiKey;
+      }
+    }
+
+    const targetLlmConfig = {
+      ...llmConfig,
+      apiKey: activeApiKey
+    };
+
+    const isDefaultKey = !activeApiKey || activeApiKey === diskConfig.defaultLLMConf.apiKey;
     if (isDefaultKey) {
       const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
       if (!checkRateLimit(ip)) {
@@ -198,7 +219,7 @@ async function extractHandler(request) {
       systemPrompt,
       userPrompt,
       fields,
-      llmConfig
+      llmConfig: targetLlmConfig
     });
 
     const encoder = new TextEncoder();
@@ -258,7 +279,7 @@ async function extractHandler(request) {
 
             logger.info({
               event: 'LLM_EXTRACTION_SUCCESS',
-              model: llmConfig.model || config.openai.model,
+              model: targetLlmConfig.model || diskConfig.defaultLLMConf.model,
               durationMs,
               metrics: {
                 promptTokens: doneResult.usage?.promptTokens,

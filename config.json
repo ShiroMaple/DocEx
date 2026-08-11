@@ -25,6 +25,7 @@
         "baseUrl": "https://api.moonshot.cn/v1",
         "model": "kimi-k2.7-code",
         "thinkingEffort": "medium",
+        "apiKey": "KIMI_API_KEY",
         "isDefault": true
       },
       {
@@ -34,6 +35,7 @@
         "baseUrl": "https://api.moonshot.cn/v1",
         "model": "kimi-k2.7-code-highspeed",
         "thinkingEffort": "medium",
+        "apiKey": "KIMI_API_KEY",
         "isDefault": false
       }
     ]
@@ -46,6 +48,8 @@
         "platform": "wps",
         "baseUrl": "https://365.kdocs.cn/l/",
         "tableId": "cbGbLglUXASe",
+        "appIdEnv": "WPS_APP_ID",
+        "appSecretEnv": "WPS_APP_SECRET",
         "isDefault": true
       },
       {

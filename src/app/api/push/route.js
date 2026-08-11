@@ -2,10 +2,22 @@ import { NextResponse } from 'next/server';
 import wpsService from '../../../services/wpsService.js';
 import { appendToFeishu, getFeishuSchema, getFeishuLastSerialNumber } from '../../../services/feishuService.js';
 import { withLogging, logger } from '../../../lib/logger.js';
+import { readConfigFromDisk } from '../../../config/index.js';
 
 async function pushHandler(request) {
   try {
-    const { provider, fileId, appToken, tableId, issues, fieldMapping, autoNumber, appId, appSecret } = await request.json();
+    const jsonBody = await request.json();
+    const { provider, fileId, appToken, tableId, issues, fieldMapping, autoNumber, appId } = jsonBody;
+    let appSecret = jsonBody.appSecret;
+
+    // 掩码还原逻辑
+    if (appSecret === '••••••••••••••••••••') {
+      const diskConfig = readConfigFromDisk();
+      const match = diskConfig.parsedTableConfigs.find(c => c.appId === appId);
+      if (match && match.appSecret) {
+        appSecret = match.appSecret;
+      }
+    }
 
     if (!issues || issues.length === 0) {
       return NextResponse.json({ error: '没有需要推送的记录' }, { status: 400 });

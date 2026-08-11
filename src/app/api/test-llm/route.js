@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { config } from '../../../config.js';
+import { readConfigFromDisk } from '../../../config/index.js';
 import { checkRateLimit } from '../../../lib/rateLimit.js';
 import { withLogging, logger } from '../../../lib/logger.js';
 
@@ -11,7 +11,20 @@ async function testLlmHandler(request) {
   try {
     let { apiKey, baseUrl, model } = await request.json();
 
-    const isDefaultKey = !apiKey || apiKey === config.openai.apiKey;
+    // 1. 如果传入的是前端安全脱敏掩码，则从物理磁盘配置中动态还原真实 Key
+    const isMask = apiKey === '••••••••••••••••••••';
+    const diskConfig = readConfigFromDisk();
+    
+    if (isMask) {
+      const match = diskConfig.defaultLLMList.find(c => c.model === model && c.baseUrl === baseUrl);
+      if (match && match.apiKey) {
+        apiKey = match.apiKey;
+      } else {
+        apiKey = diskConfig.defaultLLMConf.apiKey;
+      }
+    }
+
+    const isDefaultKey = !apiKey || apiKey === diskConfig.defaultLLMConf.apiKey;
     if (isDefaultKey) {
       const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
       if (!checkRateLimit(ip)) {
@@ -23,27 +36,29 @@ async function testLlmHandler(request) {
     }
 
     if (!apiKey) {
-      apiKey = config.openai.apiKey;
+      apiKey = diskConfig.defaultLLMConf.apiKey;
     }
     if (!baseUrl) {
-      baseUrl = config.openai.baseUrl;
+      baseUrl = diskConfig.defaultLLMConf.baseUrl;
     }
     if (!model) {
-      model = config.openai.model;
+      model = diskConfig.defaultLLMConf.model;
     }
 
     if (!apiKey || !model) {
       return NextResponse.json({ error: 'apiKey 和 model 为必填参数' }, { status: 400 });
     }
 
+    // 2. 初始化 OpenAI 客户端，增加 8 秒超时限制保护防止代理或配置错误导致长时间挂起
     const openai = new OpenAI({
       apiKey: apiKey,
-      baseURL: baseUrl || 'https://api.openai.com/v1'
+      baseURL: baseUrl || 'https://api.openai.com/v1',
+      timeout: 8000
     });
 
     let supportVision = false;
 
-    // 1. 首先尝试进行多模态图片识别测试 (1x1 像素透明 PNG)
+    // 3. 首先尝试进行多模态图片识别测试 (1x1 像素透明 PNG)
     try {
       const visionResponse = await openai.chat.completions.create({
         model: model,
@@ -74,7 +89,7 @@ async function testLlmHandler(request) {
       }, '多模态 Vision 测试失败，将尝试纯文本可用性测试');
     }
 
-    // 2. 如果 Vision 测试失败，测试纯文本连通性
+    // 4. 如果 Vision 测试失败，测试纯文本连通性
     if (!supportVision) {
       try {
         const textResponse = await openai.chat.completions.create({
