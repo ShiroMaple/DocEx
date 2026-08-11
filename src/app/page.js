@@ -1730,7 +1730,7 @@ export default function DocumentExtractor({ presetId = null }) {
                 <span>
                   {preset
                     ? (preset.badgeText || preset.subtitle || preset.name)
-                    : (allPresetsList.find(p => p.id === 'default')?.badgeText || '智能结构化文档数据提取')}
+                    : (allPresetsList.find(p => p.id === 'default')?.badgeText || '智能结构化文档信息提取')}
                 </span>
                 <ChevronDown size={12} className={`text-stone-gray transition-transform duration-200 ${activePopover === 'version' ? 'rotate-180' : ''}`} />
               </button>
@@ -2790,118 +2790,118 @@ export default function DocumentExtractor({ presetId = null }) {
 
                     {/* Results grid */}
                     <div className="border border-border-cream rounded-lg bg-white shadow-sm max-h-[650px] overflow-auto">
-                        <table className="min-w-[1300px] w-full border-collapse text-left text-xs table-fixed">
-                          <thead className="bg-parchment border-b border-border-cream shadow-[0_1px_0_0_#e8e6dc] [&_th:first-child]:rounded-tl-lg [&_th:last-child]:rounded-tr-lg">
-                            <tr>
-                              <th className="p-3 font-bold text-near-black w-[50px] text-center whitespace-nowrap sticky left-0 top-0 z-40 bg-parchment border-r border-border-cream shadow-[0_1px_0_0_#e8e6dc]">#</th>
-                              <th className="p-3 font-bold text-near-black w-[100px] text-left whitespace-nowrap sticky left-[50px] top-0 z-40 bg-parchment border-r-2 border-r-stone-200 shadow-[2px_1px_0_0_#e8e6dc] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">信息来源</th>
-                              {fields.map((f, idx) => {
-                                const dataColWidth = fields.length > 0 ? `${(85 / fields.length).toFixed(2)}%` : '85%';
+                      <table className="min-w-[1300px] w-full border-collapse text-left text-xs table-fixed">
+                        <thead className="bg-parchment border-b border-border-cream shadow-[0_1px_0_0_#e8e6dc] [&_th:first-child]:rounded-tl-lg [&_th:last-child]:rounded-tr-lg">
+                          <tr>
+                            <th className="p-3 font-bold text-near-black w-[50px] text-center whitespace-nowrap sticky left-0 top-0 z-40 bg-parchment border-r border-border-cream shadow-[0_1px_0_0_#e8e6dc]">#</th>
+                            <th className="p-3 font-bold text-near-black w-[100px] text-left whitespace-nowrap sticky left-[50px] top-0 z-40 bg-parchment border-r-2 border-r-stone-200 shadow-[2px_1px_0_0_#e8e6dc] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">信息来源</th>
+                            {fields.map((f, idx) => {
+                              const dataColWidth = fields.length > 0 ? `${(85 / fields.length).toFixed(2)}%` : '85%';
+                              return (
+                                <th key={idx} style={{ width: dataColWidth }} className="p-3 font-bold text-near-black truncate sticky top-0 z-30 bg-parchment" title={f.label}>
+                                  {f.label || `列_${idx + 1}`}
+                                </th>
+                              );
+                            })}
+                            <th className="p-3 font-bold text-near-black text-center w-[6%] whitespace-nowrap sticky top-0 z-30 bg-parchment">操作</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border-cream">
+                          {extractedIssues.map((issue, rowIndex) => (
+                            <tr key={rowIndex} className="hover:bg-ivory/30 transition">
+                              <td className="p-3 font-bold text-stone-gray text-center sticky left-0 z-10 bg-white border-r border-border-cream w-[50px]">{rowIndex + 1}</td>
+
+                              {/* 只读冻结列：数据源与页码 */}
+                              <td className="p-2 align-top sticky left-[50px] z-10 bg-stone-50/90 border-r-2 border-r-stone-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] border-l-3 border-l-terracotta/40 w-[100px]">
+                                <div className="flex flex-col gap-1 text-[10px] leading-tight w-full">
+                                  {(() => {
+                                    const fileObj = filesQueue.find(f => f.md5 === issue._fileMd5);
+                                    const fileName = fileObj ? fileObj.fileName : '手动添加';
+                                    const isManual = !issue._fileMd5;
+                                    // 10 个字符以上触发 truncate 截断，且支持文件名较长时折行换行显示
+                                    const displayName = fileName.length > 10 ? (fileName.slice(0, 10) + '...') : fileName;
+                                    // 根据文件后缀判定渲染 pdf.svg 或者是 word.svg
+                                    const ext = fileName.split('.').pop().toLowerCase();
+                                    let iconUrl = '';
+                                    if (ext === 'pdf') {
+                                      iconUrl = '/icons/pdf.svg';
+                                    } else if (ext === 'docx' || ext === 'doc') {
+                                      iconUrl = '/icons/word.svg';
+                                    }
+                                    return (
+                                      <span
+                                        className={"px-1.5 py-0.5 rounded border font-medium inline-block align-middle break-all whitespace-normal leading-normal text-[9px] " + (
+                                          isManual
+                                            ? 'bg-stone-100 text-stone-500 border-stone-200'
+                                            : 'bg-warm-sand/50 text-olive-gray border-border-cream/80'
+                                        )}
+                                        title={fileName}
+                                      >
+                                        {iconUrl ? (
+                                          <img
+                                            src={iconUrl}
+                                            alt={ext}
+                                            className="w-3.5 h-3.5 inline-block align-middle mr-1.5 object-contain"
+                                          />
+                                        ) : (
+                                          <span className="inline-block align-middle mr-1">📄</span>
+                                        )}
+                                        <span className="align-middle">{displayName}</span>
+                                      </span>
+                                    );
+                                  })()}
+                                  {(() => {
+                                    const hasMd5 = !!issue._fileMd5;
+                                    if (!hasMd5) return null;
+                                    const rawPage = issue._page;
+                                    const displayPage = rawPage ? ("P. " + rawPage) : 'P. 1';
+                                    return (
+                                      <span className="bg-orange-50 text-orange-700 border border-orange-200/60 px-2 py-0.5 rounded font-bold w-max text-[9px] inline-block mt-0.5 shadow-2xs">
+                                        {displayPage}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                              </td>
+
+                              {fields.map((f, colIndex) => {
+                                const key = f.key || `field_${colIndex + 1}`;
+                                const errKey = `${rowIndex}_${key}`;
+                                const isInvalid = !!validationErrors[errKey];
+
                                 return (
-                                  <th key={idx} style={{ width: dataColWidth }} className="p-3 font-bold text-near-black truncate sticky top-0 z-30 bg-parchment" title={f.label}>
-                                    {f.label || `列_${idx + 1}`}
-                                  </th>
+                                  <td key={colIndex} className="p-2 align-top">
+                                    <div className="relative">
+                                      <div
+                                        contentEditable="true"
+                                        suppressContentEditableWarning={true}
+                                        onBlur={(e) => updateIssueCell(rowIndex, key, e.target.innerText.trim())}
+                                        className={`border rounded px-2.5 py-1.5 text-xs outline-none focus:bg-ivory/50 focus:border-terracotta transition min-h-[28px] break-words whitespace-normal leading-relaxed ${isInvalid ? 'border-red-400 bg-red-50/50' : 'border-transparent hover:border-border-warm hover:bg-parchment/20'
+                                          }`}
+                                      >
+                                        {issue[key] || ''}
+                                      </div>
+                                      {isInvalid && (
+                                        <span className="absolute left-2.5 -bottom-3 text-[10px] text-error-crimson font-medium bg-white px-1 shadow-sm rounded-sm border border-red-100">{validationErrors[errKey]}</span>
+                                      )}
+                                    </div>
+                                  </td>
                                 );
                               })}
-                              <th className="p-3 font-bold text-near-black text-center w-[6%] whitespace-nowrap sticky top-0 z-30 bg-parchment">操作</th>
+
+                              <td className="p-2 text-center align-top">
+                                <button
+                                  onClick={() => removeIssueRow(rowIndex)}
+                                  className="text-stone-gray hover:text-error-crimson p-1.5 rounded transition mt-0.5"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border-cream">
-                            {extractedIssues.map((issue, rowIndex) => (
-                              <tr key={rowIndex} className="hover:bg-ivory/30 transition">
-                                <td className="p-3 font-bold text-stone-gray text-center sticky left-0 z-10 bg-white border-r border-border-cream w-[50px]">{rowIndex + 1}</td>
-
-                                {/* 只读冻结列：数据源与页码 */}
-                                <td className="p-2 align-top sticky left-[50px] z-10 bg-stone-50/90 border-r-2 border-r-stone-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] border-l-3 border-l-terracotta/40 w-[100px]">
-                                  <div className="flex flex-col gap-1 text-[10px] leading-tight w-full">
-                                    {(() => {
-                                      const fileObj = filesQueue.find(f => f.md5 === issue._fileMd5);
-                                      const fileName = fileObj ? fileObj.fileName : '手动添加';
-                                      const isManual = !issue._fileMd5;
-                                      // 10 个字符以上触发 truncate 截断，且支持文件名较长时折行换行显示
-                                      const displayName = fileName.length > 10 ? (fileName.slice(0, 10) + '...') : fileName;
-                                      // 根据文件后缀判定渲染 pdf.svg 或者是 word.svg
-                                      const ext = fileName.split('.').pop().toLowerCase();
-                                      let iconUrl = '';
-                                      if (ext === 'pdf') {
-                                        iconUrl = '/icons/pdf.svg';
-                                      } else if (ext === 'docx' || ext === 'doc') {
-                                        iconUrl = '/icons/word.svg';
-                                      }
-                                      return (
-                                        <span
-                                          className={"px-1.5 py-0.5 rounded border font-medium inline-block align-middle break-all whitespace-normal leading-normal text-[9px] " + (
-                                            isManual
-                                              ? 'bg-stone-100 text-stone-500 border-stone-200'
-                                              : 'bg-warm-sand/50 text-olive-gray border-border-cream/80'
-                                          )}
-                                          title={fileName}
-                                        >
-                                          {iconUrl ? (
-                                            <img
-                                              src={iconUrl}
-                                              alt={ext}
-                                              className="w-3.5 h-3.5 inline-block align-middle mr-1.5 object-contain"
-                                            />
-                                          ) : (
-                                            <span className="inline-block align-middle mr-1">📄</span>
-                                          )}
-                                          <span className="align-middle">{displayName}</span>
-                                        </span>
-                                      );
-                                    })()}
-                                    {(() => {
-                                      const hasMd5 = !!issue._fileMd5;
-                                      if (!hasMd5) return null;
-                                      const rawPage = issue._page;
-                                      const displayPage = rawPage ? ("P. " + rawPage) : 'P. 1';
-                                      return (
-                                        <span className="bg-orange-50 text-orange-700 border border-orange-200/60 px-2 py-0.5 rounded font-bold w-max text-[9px] inline-block mt-0.5 shadow-2xs">
-                                          {displayPage}
-                                        </span>
-                                      );
-                                    })()}
-                                  </div>
-                                </td>
-
-                                {fields.map((f, colIndex) => {
-                                  const key = f.key || `field_${colIndex + 1}`;
-                                  const errKey = `${rowIndex}_${key}`;
-                                  const isInvalid = !!validationErrors[errKey];
-
-                                  return (
-                                    <td key={colIndex} className="p-2 align-top">
-                                      <div className="relative">
-                                        <div
-                                          contentEditable="true"
-                                          suppressContentEditableWarning={true}
-                                          onBlur={(e) => updateIssueCell(rowIndex, key, e.target.innerText.trim())}
-                                          className={`border rounded px-2.5 py-1.5 text-xs outline-none focus:bg-ivory/50 focus:border-terracotta transition min-h-[28px] break-words whitespace-normal leading-relaxed ${isInvalid ? 'border-red-400 bg-red-50/50' : 'border-transparent hover:border-border-warm hover:bg-parchment/20'
-                                            }`}
-                                        >
-                                          {issue[key] || ''}
-                                        </div>
-                                        {isInvalid && (
-                                          <span className="absolute left-2.5 -bottom-3 text-[10px] text-error-crimson font-medium bg-white px-1 shadow-sm rounded-sm border border-red-100">{validationErrors[errKey]}</span>
-                                        )}
-                                      </div>
-                                    </td>
-                                  );
-                                })}
-
-                                <td className="p-2 text-center align-top">
-                                  <button
-                                    onClick={() => removeIssueRow(rowIndex)}
-                                    className="text-stone-gray hover:text-error-crimson p-1.5 rounded transition mt-0.5"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
 
                     {/* Push feedback results */}
                     {pushResult && (
