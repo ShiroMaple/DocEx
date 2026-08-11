@@ -343,11 +343,9 @@ export default function DocumentExtractor({ presetId = null }) {
 
           setPlatform(activeTableConfig.platform || 'wps');
 
-          const savedWpsUrl = localStorage.getItem('docex_wps_url');
-          const savedFeishuUrl = localStorage.getItem('docex_feishu_url');
-
-          const resolvedWpsUrl = savedWpsUrl || defaultWpsConf?.url || '';
-          const resolvedFeishuUrl = savedFeishuUrl || defaultFeishuConf?.url || '';
+          // 直接使用后端物理 config.json 的默认配置，不再受 localStorage 脏数据交叉污染
+          const resolvedWpsUrl = defaultWpsConf?.url || '';
+          const resolvedFeishuUrl = defaultFeishuConf?.url || '';
 
           setWpsUrl(resolvedWpsUrl);
           setFeishuUrl(resolvedFeishuUrl);
@@ -404,7 +402,7 @@ export default function DocumentExtractor({ presetId = null }) {
     if (wpsUrl) {
       const match = wpsUrl.match(/\/l\/([^?#/]+)/);
       setWpsFileId(match ? match[1] : wpsUrl.trim());
-      localStorage.setItem('docex_wps_url', wpsUrl);
+      // localStorage.setItem('docex_wps_url', wpsUrl);
     } else {
       setWpsFileId('');
     }
@@ -423,7 +421,7 @@ export default function DocumentExtractor({ presetId = null }) {
         const tableMatch = feishuUrl.match(/[?&]table=([a-zA-Z0-9]+)/);
         setFeishuTableId(tableMatch ? tableMatch[1] : '');
       }
-      localStorage.setItem('docex_feishu_url', feishuUrl);
+      // localStorage.setItem('docex_feishu_url', feishuUrl);
     } else {
       setFeishuAppToken('');
       setFeishuTableId('');
