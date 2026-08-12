@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2026 ShiroMaple <shiromaple@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { AsyncLocalStorage } from 'async_hooks';
 import pino from 'pino';
 import crypto from 'crypto';
@@ -53,7 +70,7 @@ export const logger = pino({
   // Auto-merge context traceId
   mixin() {
     const store = als.getStore();
-    return store ? { traceId: store.traceId } : {};
+    return store ? { traceId: store.traceId, ip: store.ip } : {};
   },
   transport: isProd
     ? {
@@ -114,8 +131,13 @@ if (typeof process !== 'undefined') {
 export function withLogging(handler) {
   return async (request, context) => {
     const traceId = request.headers.get('x-trace-id') || crypto.randomUUID();
+    let ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '';
+    if (ip && ip.includes(',')) {
+      ip = ip.split(',')[0].trim();
+    }
+    if (!ip) ip = '127.0.0.1';
 
-    return als.run({ traceId }, async () => {
+    return als.run({ traceId, ip }, async () => {
       const url = new URL(request.url);
       
       // Ingress Log

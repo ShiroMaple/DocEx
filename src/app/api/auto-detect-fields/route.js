@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2026 ShiroMaple <shiromaple@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
@@ -19,6 +36,7 @@ function isVisionModel(modelName) {
 
 async function autoDetectFieldsHandler(request) {
   try {
+    const startTime = Date.now();
     const jsonBody = await request.json();
     const { md5 } = jsonBody;
     const llmConfig = jsonBody.llmConfig || {};
@@ -180,6 +198,7 @@ async function autoDetectFieldsHandler(request) {
     }
 
     // 5. 发送请求给大模型进行字段推演 (流式响应)
+
     logger.info({
       event: 'AUTO_DETECT_FIELDS_START',
       model: llmConfig.model,
@@ -230,6 +249,19 @@ async function autoDetectFieldsHandler(request) {
 
           const promptTokens = Math.round(JSON.stringify(messages).length / 1.5);
           const completionTokens = Math.round(completeText.length / 1.5);
+          const totalTokens = promptTokens + completionTokens;
+          const durationMs = Date.now() - startTime;
+
+          logger.info({
+            event: 'AUDIT_FIELD_AUTO_DETECT',
+            operator: request.headers.get('x-operator') || 'User',
+            fileName: record.fileName,
+            model: llmConfig.model || 'kimi-k2.7-code',
+            isVision,
+            durationMs,
+            tokenUsage: { promptTokens, completionTokens, totalTokens },
+            fieldsCount: cleanedFields.length
+          }, `用户成功完成对文档 [${record.fileName}] 的 AI 字段自动识别推荐，生成字段 [${cleanedFields.length} 个]，耗时 [${durationMs}ms]。Token 用量: [输入: ${promptTokens}, 输出: ${completionTokens}, 总计: ${totalTokens}]`);
 
           controller.enqueue(encoder.encode(JSON.stringify({
             type: 'done',
@@ -237,7 +269,7 @@ async function autoDetectFieldsHandler(request) {
             usage: {
               promptTokens,
               completionTokens,
-              totalTokens: promptTokens + completionTokens
+              totalTokens
             }
           }) + '\n'));
           controller.close();

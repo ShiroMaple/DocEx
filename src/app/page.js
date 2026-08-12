@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2026 ShiroMaple <shiromaple@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -1068,6 +1085,14 @@ export default function DocumentExtractor({ presetId = null }) {
       alert('请先上传文件或从历史记录中选择至少一个已准备就绪的文档！');
       return;
     }
+
+    // 校验配置字段是否为空（过滤掉无名称的空字段记录）
+    const validFields = fields.filter(f => f && f.label && f.label.trim() !== '');
+    if (validFields.length === 0) {
+      alert('请至少配置一个有效的字段（字段名不可为空）再开始解析！');
+      return;
+    }
+
     // 解耦后，大模型解析前不再阻断校验多维表格连接
 
     setExtractionError('');

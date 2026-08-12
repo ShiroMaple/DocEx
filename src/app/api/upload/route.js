@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2026 ShiroMaple <shiromaple@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
@@ -21,6 +38,7 @@ async function uploadHandler(request) {
       }, 'TTL cleanup failed');
     });
 
+    const startTime = Date.now();
     const formData = await request.formData();
     const file = formData.get('file');
 
@@ -68,6 +86,17 @@ async function uploadHandler(request) {
     }
 
     if (existing && (existing.status !== 'done' || physicalExists)) {
+      const durationMs = Date.now() - startTime;
+      logger.info({
+        event: 'AUDIT_DOCUMENT_UPLOAD',
+        operator: request.headers.get('x-operator') || 'User',
+        fileName,
+        fileSize: file.size,
+        md5,
+        cacheHit: true,
+        durationMs
+      }, `用户上传了文档 [${fileName}]，大小为 [${(file.size / 1024 / 1024).toFixed(2)} MB]，耗时 [${durationMs}ms] (已复用历史预处理缓存)`);
+
       logger.info({
         event: 'PREPROCESS_CACHE_HIT',
         file: { md5, ext },
@@ -98,6 +127,17 @@ async function uploadHandler(request) {
 
     // 5. 后台启动异步预处理脚本
     triggerPreprocessing(md5);
+
+    const durationMs = Date.now() - startTime;
+    logger.info({
+      event: 'AUDIT_DOCUMENT_UPLOAD',
+      operator: request.headers.get('x-operator') || 'User',
+      fileName,
+      fileSize: file.size,
+      md5,
+      cacheHit: false,
+      durationMs
+    }, `用户上传了新文档 [${fileName}]，大小为 [${(file.size / 1024 / 1024).toFixed(2)} MB]，耗时 [${durationMs}ms]，后台异步预处理中`);
 
     return NextResponse.json({ 
       success: true, 

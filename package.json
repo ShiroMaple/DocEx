@@ -18,7 +18,7 @@
     "zod"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "GPL-3.0-only",
   "dependencies": {
     "@google/genai": "^2.10.0",
     "@napi-rs/canvas": "^1.0.2",

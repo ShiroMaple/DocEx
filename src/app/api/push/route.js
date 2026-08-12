@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2026 ShiroMaple <shiromaple@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { NextResponse } from 'next/server';
 import wpsService from '../../../services/wpsService.js';
 import { appendToFeishu, getFeishuSchema, getFeishuLastSerialNumber } from '../../../services/feishuService.js';
@@ -6,6 +23,7 @@ import { readConfigFromDisk } from '../../../config/index.js';
 
 async function pushHandler(request) {
   try {
+    const startTime = Date.now();
     const jsonBody = await request.json();
     const { provider, fileId, appToken, tableId, issues, fieldMapping, autoNumber, appId } = jsonBody;
     let appSecret = jsonBody.appSecret;
@@ -95,6 +113,18 @@ async function pushHandler(request) {
       if (!fileId) return NextResponse.json({ error: '缺少 fileId' }, { status: 400 });
       wpsService.setFileId(fileId);
       const result = await wpsService.appendRecords(modifiedIssues, null, resolvedMapping, appId, appSecret);
+      
+      const durationMs = Date.now() - startTime;
+      logger.info({
+        event: 'AUDIT_DATA_PUSH',
+        operator: request.headers.get('x-operator') || 'User',
+        provider: 'wps',
+        fileId,
+        sheetName: wpsService.sheetName || '默认数据表',
+        insertedCount: issues.length,
+        durationMs
+      }, `成功将提取的数据 [${issues.length} 条] 推送至云端 WPS 多维表格 [${wpsService.sheetName || '默认数据表'}]，表格 ID: [${fileId}]，耗时 [${durationMs}ms]`);
+
       return NextResponse.json({ success: true, insertedCount: issues.length, result });
 
     } else if (targetProvider === 'feishu') {
@@ -102,6 +132,18 @@ async function pushHandler(request) {
         return NextResponse.json({ error: '缺少 appToken 或 tableId' }, { status: 400 });
       }
       const result = await appendToFeishu(modifiedIssues, appToken, tableId, resolvedMapping, appId, appSecret);
+      
+      const durationMs = Date.now() - startTime;
+      logger.info({
+        event: 'AUDIT_DATA_PUSH',
+        operator: request.headers.get('x-operator') || 'User',
+        provider: 'feishu',
+        appToken,
+        tableId,
+        insertedCount: issues.length,
+        durationMs
+      }, `成功将提取的数据 [${issues.length} 条] 推送至云端飞书多维表格，数据表 ID: [${tableId}]，耗时 [${durationMs}ms]`);
+
       return NextResponse.json({ success: true, insertedCount: issues.length, result });
 
     } else {

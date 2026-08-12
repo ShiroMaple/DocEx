@@ -43,6 +43,13 @@ DocEx 是一款基于 **Next.js Fullstack (App Router)**、**Tailwind CSS**、**
 * **手动删除联动**：删除历史文件记录时，同步清除其上传的源文件和所有的 PNG 图片切片文件夹，确保磁盘不残留多余碎图。
 * **TTL 7天自动回收**：系统在每次上传文件时，自动执行 TTL 检查，物理销毁上传时间超过 7 天的文件及图片目录。
 
+### 6. 👁️ 业务审计与可观测性体系
+
+* **零侵入全链路追踪**：基于 `AsyncLocalStorage` (ALS) 实现，在入口统一解析真实客户端 IP 与 TraceID，底层 `pino` 日志在任意深度的代码中自动混入追踪信息。
+* **操作人智能继承**：日志接口在加载滚动日志时，若同一 Trace 链路中的某一条关键业务审计日志记录了操作人（Operator），系统会自动为同链路的其它所有 API 访问日志继承该操作人，无缝兜底显示。
+* **业务指标精细化**：在文档上传、字段识别、模型提取、表格推送的关键成功节点，执行 `AUDIT` 级别插桩，附带执行耗时及生成规模；其中大模型调用还显式记录了 Input/Output 详细 Token 开销，支撑运营核算。
+* **可视化审计终端**：内置精美的 `/admin/logs` 终端大屏，支持按事件分类 (AUDIT/SYSTEM)、等级及关键字进行模糊词频组合过滤；并自研了一套无第三方依赖的极致轻量正则表达式 JSON 语法高亮器，解析并高亮附加 Metadata 负载。
+
 ---
 
 ## 🛠️ 技术栈
@@ -133,3 +140,9 @@ server {
 ### 3. 提示词防注入网关
 
 项目在 `/api/extract` 设有提示词安全攻击防御过滤，如果用户输入的描述包含 `.env`、`passwd`、`api_key` 等词汇会被拦截。内测期间如遇正常字段误杀，可在 `src/app/api/extract/route.js` 的 `checkPromptSecurity` 正则规则中做针对性微调。
+
+---
+
+## 📄 开源协议
+
+本项目基于 **GNU General Public License v3.0 (GPL-3.0)** 协议开源。详情请参阅 [LICENSE](file:///c:/Users/gaoft/Documents/CodeSpace/docex/LICENSE) 文件。

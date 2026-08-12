@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2026 ShiroMaple <shiromaple@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
@@ -276,6 +293,17 @@ async function extractHandler(request) {
               filteredCount = droppedResults.length;
               logger.info({ event: 'POST_FILTER_COMPLETE', originalCount, finalCount: validResults.length, droppedCount: droppedResults.length }, '后置过滤引擎执行完毕');
             }
+
+            logger.info({
+              event: 'AUDIT_DOCUMENT_EXTRACT',
+              operator: request.headers.get('x-operator') || 'User',
+              fileName: record.fileName,
+              model: targetLlmConfig.model || diskConfig.defaultLLMConf.model,
+              fieldsCount: fields.length,
+              tokenUsage: doneResult.usage,
+              durationMs,
+              recordsCount: filteredData.length
+            }, `对文档 [${record.fileName}] 成功执行多维结构化提取，匹配字段 [${fields.length} 个]，生成记录 [${filteredData.length} 条]，耗时 [${durationMs}ms]。Token 用量: [输入: ${doneResult.usage?.promptTokens || 0}, 输出: ${doneResult.usage?.completionTokens || 0}, 总计: ${doneResult.usage?.totalTokens || 0}]`);
 
             logger.info({
               event: 'LLM_EXTRACTION_SUCCESS',

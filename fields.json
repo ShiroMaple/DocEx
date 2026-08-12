@@ -222,5 +222,47 @@
         "isAdvancedOpen": false
       }
     ]
+  },
+  {
+    "id": "medical_examination_report",
+    "name": "体检报告提取",
+    "description": "用于提取体检报告信息的预设字段配置",
+    "fields": [
+      {
+        "key": "field_1",
+        "label": "姓名",
+        "desc": "体验报告被检对象的姓名",
+        "example": "张三",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "field_2",
+        "label": "收缩压",
+        "desc": "",
+        "example": "",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "field_3",
+        "label": "舒张压",
+        "desc": "",
+        "example": "",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "field_4",
+        "label": "左眼视力",
+        "desc": "",
+        "example": "",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "field_5",
+        "label": "右眼视力",
+        "desc": "",
+        "example": "",
+        "isAdvancedOpen": false
+      }
+    ]
   }
 ]
