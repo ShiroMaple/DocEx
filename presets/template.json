@@ -10,6 +10,7 @@
 
   "locked": "全局锁定开关 (布尔值 true / false)。作用：简易总开关，当未指定细粒度权限时，true 代表全部锁定",
   "allowAutoDetectFields": "允许使用 AI 自动识别推演提取字段 (布尔值 true / false，默认 false)。作用：若为 false，将隐藏步骤 2 中“🔮 自动识别字段”的 AI 推演分析按钮",
+  "allowSwitchFields": "允许用户在步骤 2 动态切换字段配置 (布尔值 true / false，默认 false)。作用：若为 true，将在第 2 步左侧展示字段配置切换下拉菜单",
 
   "allowCustomModel": "允许配置自定义模型 (布尔值 true / false，默认 false)。作用：若为 false，将禁用/锁定顶栏大模型 API Key、BaseUrl、Model 的修改入口",
   "allowCustomPlatform": "允许配置自定义文档平台 (布尔值 true / false，默认 false)。作用：若为 false，将禁用/锁定顶栏 WPS / 飞书链接及凭证的修改入口",
@@ -19,21 +20,12 @@
   "systemPrompt": "大模型系统提示词 (System Prompt)。作用：传给 OpenAI/大模型的核心指令，指导模型如何理解文档、按什么规则区分隐患条目、如何处理日期格式等",
   "userPrompt": "大模型用户提示词前缀 (User Prompt)。作用：在把预处理文档内容提交给大模型时放在正文前的引导说明",
 
-  "fields": [
-    {
-      "_field_explain": "--- 提取字段对象数组，定义要从文档中抽取哪些数据项 ---",
-      "key": "字段英文 Key (必填，英文字母)。作用：大模型返回 JSON 中的属性名，以及代码内部传递的主键，如 'projectName'",
-      "label": "字段中文名称 (必填)。作用：显示在第 2 步字段配置表头、第 3 步解析结果预览表格的列名，以及 Excel 导出表头",
-      "desc": "字段提取说明 (必填)。作用：告知大模型该字段的具体定义，例如 '发现问题的具体位置、点位'",
-      "example": "字段示例 (选填)。作用：给大模型的参考示例，提高特定格式字段提取的准确率",
-      "isAdvancedOpen": false
-    }
-  ],
+  "fieldsRef": "引用 fields.json 中的字段配置 ID (必填，如 'default' 或 'hse')。作用：系统启动时，将自动从根目录下的 fields.json 读取该 ID 对应的字段列表并进行物理装配",
 
   "fieldMapping": {
     "_mapping_explain": "--- 字段与云端多维表格 (WPS / 飞书) 的列名映射矩阵 ---",
-    "云端多维表格列名 1": "对应上面定义的字段英文 key (例如 'projectName')",
-    "云端多维表格列名 2": "对应上面定义的字段英文 key (例如 'description')"
+    "云端多维表格列名 1": "对应 fields.json 中定义的字段英文 key (例如 'projectName')",
+    "云端多维表格列名 2": "对应 fields.json 中定义的字段英文 key (例如 'description')"
   },
 
   "_env_overrides_documentation": {

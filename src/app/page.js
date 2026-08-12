@@ -133,6 +133,7 @@ export default function DocumentExtractor({ presetId = null }) {
   // ── Step 2: Unified Matrix Schema ──
   const [customPrompt, setCustomPrompt] = useState('');
   const [fields, setFields] = useState([]);
+  const [selectedFieldsId, setSelectedFieldsId] = useState('');
   const [isOptimizingPrompt, setIsOptimizingPrompt] = useState(false);
   const [fieldMappings, setFieldMappings] = useState({}); // { spreadsheetColumnName: docexFieldKey }
   const [isSchemaLoading, setIsSchemaLoading] = useState(false);
@@ -269,6 +270,7 @@ export default function DocumentExtractor({ presetId = null }) {
           const p = data.preset;
           setPreset(p);
           if (p.fields && p.fields.length > 0) setFields(p.fields);
+          setSelectedFieldsId(p.fieldsRef || 'default');
           if (p.systemPrompt) setCustomPrompt(p.systemPrompt);
           if (p.fieldMapping) setFieldMappings(p.fieldMapping);
           if (p.platform) setPlatform(p.platform);
@@ -2412,6 +2414,37 @@ export default function DocumentExtractor({ presetId = null }) {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {preset?.allowSwitchFields && preset?.availableFieldsList?.length > 0 && (
+                          <div className="flex items-center gap-1.5 text-xs text-olive-gray mr-2">
+                            <span className="font-semibold whitespace-nowrap">📋 字段配置：</span>
+                            <select
+                              value={selectedFieldsId || preset.fieldsRef || 'default'}
+                              onChange={(e) => {
+                                const newId = e.target.value;
+                                if (extractedIssues.length > 0) {
+                                  if (!confirm('切换字段配置将清除当前已解析的隐患结果，是否确定切换？')) {
+                                    return;
+                                  }
+                                }
+                                const selectedGroup = preset.availableFieldsList.find(g => g.id === newId);
+                                if (selectedGroup) {
+                                  setSelectedFieldsId(newId);
+                                  setFields(selectedGroup.fields);
+                                  setExtractedIssues([]); // 清空解析结果以防结构错位
+                                  showToast(`📋 已成功切换为【${selectedGroup.name}】字段配置`);
+                                }
+                              }}
+                              className="bg-ivory border border-border-cream/80 text-near-black rounded px-2.5 py-1.5 text-xs font-semibold outline-none transition focus:border-terracotta focus:ring-1 focus:ring-terracotta cursor-pointer max-w-[160px]"
+                            >
+                              {preset.availableFieldsList.map(group => (
+                                <option key={group.id} value={group.id} title={group.description}>
+                                  {group.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
                         {preset?.allowAutoDetectFields && (
                           <button
                             onClick={autoDetectFields}
@@ -2427,14 +2460,51 @@ export default function DocumentExtractor({ presetId = null }) {
                         {canCustomFields && (
                           <button
                             onClick={() => {
-                              if (confirm('是否还原到默认字段配置？这将丢失现有配置。')) {
-                                if (preset?.fields) setFields(preset.fields);
-                                if (preset?.systemPrompt) setCustomPrompt(preset.systemPrompt);
+                              const defaultId = `${preset?.id || 'default'}_custom`;
+                              const customId = prompt('请输入新配置的 ID（仅支持英文字母、数字和下划线）：', defaultId);
+                              if (customId === null) return; // 取消
+                              if (!customId.trim()) {
+                                showToast('配置 ID 不能为空！');
+                                return;
                               }
+
+                              const customName = prompt('请输入新配置的名称（用于下拉菜单显示）：', '自定义提取字段');
+                              if (customName === null) return;
+                              if (!customName.trim()) {
+                                showToast('配置名称不能为空！');
+                                return;
+                              }
+
+                              const exportData = {
+                                id: customId.trim(),
+                                name: customName.trim(),
+                                description: `由用户在步骤2自定义并导出的字段配置，生成自 ${preset?.name || '通用版'}，导出时间：${new Date().toLocaleDateString()}`,
+                                fields: fields.map((f, idx) => ({
+                                  key: f.key || `field_${idx + 1}`,
+                                  label: f.label || '',
+                                  desc: f.desc || '',
+                                  example: f.example || '',
+                                  isAdvancedOpen: false
+                                }))
+                              };
+
+                              const jsonStr = JSON.stringify(exportData, null, 2);
+                              const blob = new Blob([jsonStr], { type: 'application/json' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `${exportData.id}.json`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(url);
+                              showToast('📤 字段配置导出成功！已保存为 JSON 文件，可直接发送给管理员。');
                             }}
-                            className="text-xs font-semibold text-olive-gray hover:text-near-black bg-warm-sand/50 hover:bg-warm-sand px-3 py-1 rounded transition border border-border-warm"
+                            className="text-xs font-semibold hover:text-black-hover bg-warm-sand/50 hover:bg-warm-sand px-3 py-1.5 rounded transition border border-border-warm flex items-center gap-1.5"
+                            title="将当前已定义字段集导出为 JSON 配置文件，方便管理员收录"
                           >
-                            重置为默认字段
+                            <Download size={11} />
+                            <span>导出字段配置</span>
                           </button>
                         )}
                       </div>

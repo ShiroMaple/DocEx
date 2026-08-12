@@ -100,8 +100,35 @@ export function getResolvedPreset(id) {
 
   const platform = config.getEnv(`${prefix}_TABLE_PLATFORM`, rawPreset.platform || matchedTableConfig?.platform || (lark.appToken && lark.tableId ? 'feishu' : 'wps'));
 
+  // 动态读取并解析 fields.json 文件进行装配引用
+  let resolvedFields = [];
+  let availableFieldsList = [];
+  try {
+    const fieldsJsonPath = path.resolve(process.cwd(), 'fields.json');
+    if (fs.existsSync(fieldsJsonPath)) {
+      const fieldsRaw = fs.readFileSync(fieldsJsonPath, 'utf-8');
+      const fieldsData = JSON.parse(fieldsRaw);
+      availableFieldsList = fieldsData.map(group => ({
+        id: group.id,
+        name: group.name,
+        description: group.description,
+        fields: group.fields
+      }));
+
+      const targetRef = rawPreset.fieldsRef || 'default';
+      const matchedGroup = fieldsData.find(group => group.id === targetRef);
+      if (matchedGroup) {
+        resolvedFields = matchedGroup.fields;
+      }
+    }
+  } catch (e) {
+    console.error('读取 fields.json 失败:', e);
+  }
+
   return {
     ...rawPreset,
+    fields: resolvedFields,
+    availableFieldsList,
     llmProvider: provider,
     openai,
     lark,
@@ -160,6 +187,8 @@ export function getSafePresetForClient(id) {
     tableConfigId: resolved.tableConfigId || '',
     locked: resolved.locked,
     allowAutoDetectFields: Boolean(resolved.allowAutoDetectFields),
+    allowSwitchFields: Boolean(resolved.allowSwitchFields),
+    availableFieldsList: resolved.availableFieldsList || [],
     allowCustomModel: resolved.allowCustomModel,
     allowCustomPlatform: resolved.allowCustomPlatform,
     allowCustomFields: resolved.allowCustomFields,

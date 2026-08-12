@@ -1,0 +1,226 @@
+[
+  {
+    "id": "empty",
+    "name": "空模板",
+    "description": "",
+    "fields": [
+      {
+        "key": "",
+        "label": "",
+        "desc": "",
+        "example": "",
+        "isAdvancedOpen": false
+      }
+    ]
+  },
+  {
+    "id": "default",
+    "name": "通用提取字段",
+    "description": "默认用于示例的字段配置",
+    "fields": [
+      {
+        "key": "field1",
+        "label": "文档主题",
+        "desc": "",
+        "example": "",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "field2",
+        "label": "主要内容概述",
+        "desc": "",
+        "example": "",
+        "isAdvancedOpen": false
+      }
+    ]
+  },
+  {
+    "id": "hse",
+    "name": "安全问题提取字段",
+    "description": "安全环保部提取安全问题文档的专用字段配置",
+    "fields": [
+      {
+        "key": "projectName",
+        "label": "项目名称",
+        "desc": "隐患对应的项目或工程名称",
+        "example": "宁波工程项目",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "issueType",
+        "label": "问题类型",
+        "desc": "安全问题分类，如临时用电、高处作业",
+        "example": "高处作业",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "inspectionArea",
+        "label": "检查区域",
+        "desc": "问题被发现的具体位置、点位",
+        "example": "1号罐区脚手架搭设处",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "description",
+        "label": "问题描述",
+        "desc": "安全隐患的现状具体描述",
+        "example": "1号罐区脚手架搭设不合规，防护栏杆松动",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "rectificationRequirement",
+        "label": "整改要求",
+        "desc": "整改措施或限期完成的要求意见",
+        "example": "立即加固现场防护栏杆，并对搭设质量重新报验",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "inspector",
+        "label": "检查人员",
+        "desc": "发现问题的检查人员姓名",
+        "example": "张三",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "inspectionDate",
+        "label": "检查日期",
+        "desc": "发现隐患的日期 (YYYY-MM-DD)",
+        "example": "2026-08-12",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "contractor",
+        "label": "承包商/责任方",
+        "desc": "问题涉及的具体承包商或责任方单位名称，若未明确提及具体单位名称，填'未提及'",
+        "example": "XX工程公司",
+        "isAdvancedOpen": false
+      }
+    ]
+  },
+  {
+    "id": "invoice",
+    "name": "发票提取字段",
+    "description": "用于发票提取的字段配置",
+    "fields": [
+      {
+        "key": "invoiceNo",
+        "label": "发票号码",
+        "desc": "提取电子发票右上角的发票号码，通常为20位纯数字，忽略前缀“发票号码：”及空格。",
+        "example": "",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "invoiceDate",
+        "label": "开票日期",
+        "desc": "提取发票右上角的开票日期，格式统一为YYYY-MM-DD，忽略“开票日期：”字样。",
+        "example": "2026-08-12",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "buyerName",
+        "label": "购买方名称",
+        "desc": "提取购买方信息栏中的“名称”字段。",
+        "example": "",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "buyerTaxNo",
+        "label": "购买方纳税人识别号",
+        "desc": "提取购买方信息栏中的“统一社会信用代码/纳税人识别号”，保留字母与数字全串，不省略末尾校验位。",
+        "example": "",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "sellerName",
+        "label": "销售方名称",
+        "desc": "提取销售方信息栏中的“名称”字段。",
+        "example": "",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "sellerTaxNo",
+        "label": "销售方纳税人识别号",
+        "desc": "提取销售方信息栏中的“统一社会信用代码/纳税人识别号”，保留字母与数字全串，不省略末尾校验位。",
+        "example": "",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "itemName",
+        "label": "项目名称",
+        "desc": "提取发票明细行的“项目名称”，保留星号分类前缀及完整商品名称。",
+        "example": "*电子计算机*电脑",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "itemSpec",
+        "label": "规格型号",
+        "desc": "提取发票明细行的“规格型号”。",
+        "example": "",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "itemUnit",
+        "label": "单位",
+        "desc": "提取发票明细行的“单位”。",
+        "example": "",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "amountWithoutTax",
+        "label": "不含税金额",
+        "desc": "提取发票合计栏中的金额（不含税），去除人民币符号“¥”和千分位逗号，保留两位小数。",
+        "example": "8546.83",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "taxRate",
+        "label": "税率/征收率",
+        "desc": "提取发票合计栏中的税率，保留百分号。",
+        "example": "13%",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "taxAmount",
+        "label": "税额",
+        "desc": "提取发票合计栏中的税额，去除人民币符号“¥”和千分位逗号，保留两位小数。",
+        "example": "1111.09",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "totalAmount",
+        "label": "价税合计（小写）",
+        "desc": "提取发票价税合计（小写）金额，去除人民币符号“¥”，保留两位小数，作为报销或入账的票面总金额。",
+        "example": "9657.92",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "totalAmountInWords",
+        "label": "价税合计（大写）",
+        "desc": "提取发票价税合计（大写）金额，去除“封头”符号ⓧ，作为报销或入账的票面总金额。（应与价税合计（小写）对应）",
+        "example": "玖仟陆佰伍拾柒元玖角贰分",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "remarks",
+        "label": "备注",
+        "desc": "提取发票合计栏中的备注信息。",
+        "example": "",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "invoiceDrawer",
+        "label": "开票人",
+        "desc": "提取发票最下方的开票人信息。",
+        "example": "张三",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "invoiceType",
+        "label": "发票类型",
+        "desc": "提取发票类型，如增值税专用发票、增值税普通发票",
+        "example": "增值税专用发票",
+        "isAdvancedOpen": false
+      }
+    ]
+  }
+]
