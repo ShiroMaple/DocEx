@@ -1,8 +1,8 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'DocEx · 智能结构化文档信息提取',
-  description: '基于大语言模型的解耦式通用文档数据提取器，支持双路多模态解析与多维表格自动推送',
+  title: 'DocEx · 智能结构化提取文档信息',
+  description: '基于大语言模型的通用文档信息提取工具，支持双路多模态解析与多维表格推送',
 };
 
 export default function RootLayout({ children }) {

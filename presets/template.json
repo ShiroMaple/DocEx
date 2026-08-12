@@ -9,6 +9,7 @@
   "badgeText": "专属徽标文案 (选填)。作用：显示在专属页面顶部 Header 胶囊按钮中的文案，例如 '🛡️ 安全环保部专用版'",
 
   "locked": "全局锁定开关 (布尔值 true / false)。作用：简易总开关，当未指定细粒度权限时，true 代表全部锁定",
+  "allowAutoDetectFields": "允许使用 AI 自动识别推演提取字段 (布尔值 true / false，默认 false)。作用：若为 false，将隐藏步骤 2 中“🔮 自动识别字段”的 AI 推演分析按钮",
 
   "allowCustomModel": "允许配置自定义模型 (布尔值 true / false，默认 false)。作用：若为 false，将禁用/锁定顶栏大模型 API Key、BaseUrl、Model 的修改入口",
   "allowCustomPlatform": "允许配置自定义文档平台 (布尔值 true / false，默认 false)。作用：若为 false，将禁用/锁定顶栏 WPS / 飞书链接及凭证的修改入口",

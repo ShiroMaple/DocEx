@@ -1633,7 +1633,7 @@ export default function DocumentExtractor({ presetId = null }) {
       { number: 1, label: '上传文档', done: isStep1Done },
       { number: 2, label: '配置字段', done: isStep2Done },
       { number: 3, label: '解析结果', done: isStep3Done },
-      { number: 4, label: '推送多维表', done: isStep4Done },
+      { number: 4, label: '推送多维表格', done: isStep4Done },
     ];
 
     let progressWidth = '0%';
@@ -1727,8 +1727,8 @@ export default function DocumentExtractor({ presetId = null }) {
         <div className="max-w-[1440px] mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <a href="/" className="flex items-center gap-2 hover:opacity-90 transition">
-              <img src="/icons/logo_docex.png" alt="Logo" className="w-6 h-6 object-cover rounded-md" />
-              <span className="font-serif font-bold text-lg leading-none tracking-tight">DocEx</span>
+              <FileText className="w-5 h-5 text-terracotta" />
+              <span className="font-serif font-bold text-lg leading-none tracking-tight">DocEx 智能结构化提取文档信息</span>
             </a>
 
             {/* Version / Preset Selector Dropdown */}
@@ -1741,7 +1741,7 @@ export default function DocumentExtractor({ presetId = null }) {
                 <span>
                   {preset
                     ? (preset.badgeText || preset.subtitle || preset.name)
-                    : (allPresetsList.find(p => p.id === 'default')?.badgeText || '智能结构化文档信息提取')}
+                    : (allPresetsList.find(p => p.id === 'default')?.badgeText || '')}
                 </span>
                 <ChevronDown size={12} className={`text-stone-gray transition-transform duration-200 ${activePopover === 'version' ? 'rotate-180' : ''}`} />
               </button>
@@ -2148,7 +2148,11 @@ export default function DocumentExtractor({ presetId = null }) {
               {/* STEP 1 Card */}
               <section className="bg-ivory border border-border-cream rounded-xl p-8 shadow-sm">
                 <div className="flex items-center gap-3 mb-6">
-                  <FileText className="w-5 h-5 text-terracotta" />
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-terracotta">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
                   <h2 className="font-serif font-medium text-lg">步骤 1: 上传或选择待解析文档</h2>
                 </div>
 
@@ -2348,7 +2352,7 @@ export default function DocumentExtractor({ presetId = null }) {
                         {canCustomFields && (
                           <button
                             onClick={() => {
-                              if (confirm('是否还原到默认字段矩阵？这将丢失现有配置。')) {
+                              if (confirm('是否还原到默认字段配置？这将丢失现有配置。')) {
                                 if (preset?.fields) setFields(preset.fields);
                                 if (preset?.systemPrompt) setCustomPrompt(preset.systemPrompt);
                               }
@@ -2363,7 +2367,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
                     {!canCustomFields && (
                       <div className="mb-4 p-2.5 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs flex items-center gap-1.5 font-semibold">
-                        🔒 拆解字段矩阵已由【{preset?.department || '部门预设'}】统一标准化锁定。
+                        🔒 解析字段配置已使用【{preset?.department || '部门预设'}】标准化预设。
                       </div>
                     )}
 
@@ -2489,7 +2493,7 @@ export default function DocumentExtractor({ presetId = null }) {
                         </div>
                       ) : (
                         <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full">
-                          🔒 提示词已由部门锁定
+                          🔒 提示词已使用【{preset?.department || '部门预设'}】标准化预设
                         </span>
                       )}
                     </div>
@@ -3137,10 +3141,10 @@ export default function DocumentExtractor({ presetId = null }) {
                   }}
                   disabled={filesQueue.filter(f => f.status === 'done').length === 0}
                   className="px-4 py-2.5 rounded text-xs font-semibold border border-terracotta/40 bg-terracotta/10 text-terracotta hover:bg-terracotta/20 transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
-                  title="直接跳过第 2 步字段配置，以当前设定的字段列表开始大模型提取"
+                  title="直接跳过第 2 步配置字段，以默认的字段进行解析"
                 >
                   <Sparkles size={14} />
-                  <span>跳过预览字段，立即解析</span>
+                  <span>跳过配置字段，立即解析</span>
                 </button>
 
                 <button
