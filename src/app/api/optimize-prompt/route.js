@@ -67,13 +67,19 @@ ${fieldsDesc}
     });
 
     const optimizedPrompt = response.choices[0]?.message?.content?.trim() || prompt;
+    const usage = response.usage || {
+      promptTokens: Math.round(JSON.stringify(systemPrompt).length / 1.5),
+      completionTokens: Math.round(optimizedPrompt.length / 1.5),
+      totalTokens: Math.round(JSON.stringify(systemPrompt).length / 1.5) + Math.round(optimizedPrompt.length / 1.5)
+    };
     
     logger.info({
       event: 'PROMPT_OPTIMIZED',
-      model
+      model,
+      usage
     }, '提示词优化成功');
 
-    return NextResponse.json({ success: true, optimizedPrompt });
+    return NextResponse.json({ success: true, optimizedPrompt, usage });
 
   } catch (err) {
     logger.error({

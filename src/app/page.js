@@ -154,10 +154,22 @@ export default function DocumentExtractor({ presetId = null }) {
   const [rawLlmResponse, setRawLlmResponse] = useState('');
   const [isLlmModalOpen, setIsLlmModalOpen] = useState(false);
   const [isDetectingFields, setIsDetectingFields] = useState(false);
+  const [detectingStreamText, setDetectingStreamText] = useState('');
+  const [detectAbortController, setDetectAbortController] = useState(null);
+
+  const cancelAutoDetect = () => {
+    if (detectAbortController) {
+      detectAbortController.abort();
+      setDetectAbortController(null);
+    }
+    setIsDetectingFields(false);
+    setDetectingStreamText('');
+    showToast('已主动停止自动识别字段过程。', 'info');
+  };
 
   const autoDetectFields = () => {
     if (!llmConnected) {
-      showToast('⚠️ 智能分析受阻：请先在顶部网关设置中测试连接通过！', 'error');
+      showToast('⚠️ 智能分析受阻：请先在右上角AI模型网关配置中进行测试连接通过', 'error');
       return;
     }
     const doneFiles = filesQueue.filter(f => f.status === 'done');
@@ -167,8 +179,11 @@ export default function DocumentExtractor({ presetId = null }) {
     }
     const firstFile = doneFiles[0];
 
+    const controller = new AbortController();
+    setDetectAbortController(controller);
+    setDetectingStreamText('');
     setIsDetectingFields(true);
-    showToast('🔮 AI 正在尝试智能分析文档首页以推演最佳字段定义，请稍候...');
+    showToast('🔮 AI 正在尝试智能分析文档首页以推演最佳字段定义...');
 
     fetch('/api/auto-detect-fields', {
       method: 'POST',
@@ -176,28 +191,70 @@ export default function DocumentExtractor({ presetId = null }) {
       body: JSON.stringify({
         md5: firstFile.md5,
         llmConfig
-      })
+      }),
+      signal: controller.signal
     })
-      .then(res => {
+      .then(async (res) => {
         if (!res.ok) {
-          return res.json().then(d => { throw new Error(d.error || '分析自动识别失败') });
+          const errText = await res.text().catch(() => '分析自动识别失败');
+          throw new Error(errText);
         }
-        return res.json();
-      })
-      .then(data => {
-        if (data.success && data.fields) {
-          setFields(data.fields);
-          showToast(`🔮 智能推荐成功！一键生成并覆盖了 ${data.fields.length} 个核心字段定义。`);
-        } else {
-          showToast(data.error || '⚠️ 智能推演完毕，模型未能给出有效的字段定义。', 'error');
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const data = JSON.parse(line.trim());
+              if (data.type === 'chunk') {
+                setDetectingStreamText(prev => prev + data.text);
+              } else if (data.type === 'done') {
+                if (data.fields && data.fields.length > 0) {
+                  setFields(data.fields);
+                  showToast(`🔮 智能推荐成功！一键生成并覆盖了 ${data.fields.length} 个核心字段定义。`);
+
+                  if (data.usage) {
+                    setTokenUsage(prev => {
+                      const oldPrompt = prev?.promptTokens || 0;
+                      const oldCompletion = prev?.completionTokens || 0;
+                      const oldTotal = prev?.totalTokens || 0;
+                      return {
+                        promptTokens: oldPrompt + (data.usage.promptTokens || 0),
+                        completionTokens: oldCompletion + (data.usage.completionTokens || 0),
+                        totalTokens: oldTotal + (data.usage.totalTokens || 0)
+                      };
+                    });
+                  }
+                } else {
+                  showToast('⚠️ 智能推演完毕，模型未能从文档中识别到合适的提取字段。', 'error');
+                }
+              } else if (data.type === 'error') {
+                throw new Error(data.error);
+              }
+            } catch (jsonErr) {
+              console.error('解析流数据失败:', jsonErr);
+            }
+          }
         }
       })
       .catch(err => {
+        if (err.name === 'AbortError') return;
         console.error('智能提取失败:', err);
         showToast(`❌ 字段自动分析出错: ${err.message}`, 'error');
       })
       .finally(() => {
         setIsDetectingFields(false);
+        setDetectAbortController(null);
       });
   };
 
@@ -309,6 +366,12 @@ export default function DocumentExtractor({ presetId = null }) {
         if (!activeConfig) {
           const activeId = localStorage.getItem('docex_active_llm_config_id') || 'default';
           activeConfig = loadedList.find(c => c.id === activeId) || loadedList.find(c => c.isDefault) || loadedList[0] || defaultLLMConf;
+        }
+
+        // 防御式重刷：如果激活的是“默认配置”（default），强制使用服务器 config.json 最新拉取的 model 与 baseUrl，消除 localStorage 脏缓存干扰
+        if (activeConfig && activeConfig.id === 'default') {
+          activeConfig.model = defaultLLMConf.model;
+          activeConfig.baseUrl = defaultLLMConf.baseUrl;
         }
 
         setLlmConfig({
@@ -749,6 +812,18 @@ export default function DocumentExtractor({ presetId = null }) {
 
       setCustomPrompt(data.optimizedPrompt);
       showToast('AI 提示词优化成功！');
+      if (data.usage) {
+        setTokenUsage(prev => {
+          const oldPrompt = prev?.promptTokens || 0;
+          const oldCompletion = prev?.completionTokens || 0;
+          const oldTotal = prev?.totalTokens || 0;
+          return {
+            promptTokens: oldPrompt + (data.usage.promptTokens || 0),
+            completionTokens: oldCompletion + (data.usage.completionTokens || 0),
+            totalTokens: oldTotal + (data.usage.totalTokens || 0)
+          };
+        });
+      }
     } catch (e) {
       alert(`优化失败: ${e.message}`);
     } finally {
@@ -1489,9 +1564,9 @@ export default function DocumentExtractor({ presetId = null }) {
       const dataToExport = extractedIssues.map((issue, idx) => {
         const row = { '序号': idx + 1 };
 
-        // 增加数据来源和页码列导出到 Excel
+        // 增加信息来源和页码列导出到 Excel
         const fileObj = filesQueue.find(f => f.md5 === issue._fileMd5);
-        row['数据来源'] = fileObj ? fileObj.fileName : '手动添加';
+        row['信息来源'] = fileObj ? fileObj.fileName : '手动添加';
         row['所在页码'] = issue._page ? ("第 " + issue._page + " 页") : '第 1 页';
 
         fields.forEach((f, colIdx) => {
@@ -2328,7 +2403,7 @@ export default function DocumentExtractor({ presetId = null }) {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
                 {/* Left column: Matrix Grid (2/3 width) */}
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-2 relative">
                   <section className="bg-ivory border border-border-cream rounded-xl p-8 shadow-sm">
                     <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
                       <div className="flex items-center gap-3">
@@ -2460,6 +2535,38 @@ export default function DocumentExtractor({ presetId = null }) {
                       </button>
                     )}
                   </section>
+
+                  {/* 🔮 自动识别半透明加载浮层 */}
+                  {isDetectingFields && (
+                    <div className="absolute inset-0 bg-white/75 backdrop-blur-[1.5px] rounded-xl z-20 flex flex-col p-8 select-none animate-fade-in">
+                      <div className="flex items-center justify-between mb-4 border-b border-border-cream pb-3 flex-shrink-0">
+                        <div className="flex items-center gap-2.5 text-terracotta font-serif font-bold text-sm">
+                          <Loader2 size={16} className="animate-spin text-terracotta" />
+                          <span>AI 正在自动识别配置字段...</span>
+                        </div>
+                        <button
+                          onClick={cancelAutoDetect}
+                          className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold rounded-lg shadow-sm transition hover:scale-[1.01] active:scale-95 duration-100 flex items-center gap-1.5"
+                        >
+                          <span>🛑 停止自动识别</span>
+                        </button>
+                      </div>
+
+                      <div className="flex-1 bg-parchment/60 border border-border-cream rounded-lg p-5 flex flex-col gap-2 min-h-0">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-stone-gray uppercase tracking-wider">
+                          <span>AI 实时推理输出：</span>
+                          {detectingStreamText && (
+                            <span className="text-terracotta animate-pulse">● STREAMING</span>
+                          )}
+                        </div>
+                        <div className="flex-1 overflow-auto custom-scrollbar bg-white/40 border border-border-cream/50 rounded p-3">
+                          <pre className="text-xs font-mono text-near-black whitespace-pre-wrap break-all leading-relaxed select-text">
+                            {detectingStreamText || '正在分析文档首页并推演提取属性定义...'}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Right column: AI Prompt config (1/3 width) */}
@@ -2558,7 +2665,7 @@ export default function DocumentExtractor({ presetId = null }) {
                           <thead>
                             <tr className="bg-parchment border-b border-border-cream">
                               <th className="p-3 font-bold text-near-black w-[50px] text-center sticky top-0 bg-parchment border-r border-border-cream">#</th>
-                              <th className="p-3 font-bold text-near-black w-[120px] text-left sticky top-0 bg-parchment border-r-2 border-r-stone-200">数据来源</th>
+                              <th className="p-3 font-bold text-near-black w-[120px] text-left sticky top-0 bg-parchment border-r-2 border-r-stone-200">信息来源</th>
                               {fields.map((f, idx) => (
                                 <th key={idx} className="p-3 font-bold text-near-black truncate sticky top-0 bg-parchment" title={f.label}>
                                   {f.label}
@@ -2570,8 +2677,54 @@ export default function DocumentExtractor({ presetId = null }) {
                             {extractedIssues.map((issue, rowIndex) => (
                               <tr key={rowIndex} className="hover:bg-ivory/30 transition">
                                 <td className="p-3 font-bold text-stone-gray text-center sticky left-0 z-10 bg-white border-r border-border-cream w-[50px]">{rowIndex + 1}</td>
-                                <td className="p-2 align-top sticky left-[50px] z-10 bg-stone-50/90 border-r-2 border-r-stone-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] border-l-3 border-l-terracotta/40 w-[120px] truncate" title={filesQueue.find(f => f.md5 === issue._fileMd5)?.fileName || '手动添加'}>
-                                  {filesQueue.find(f => f.md5 === issue._fileMd5)?.fileName || '手动添加'}
+                                <td className="p-2 align-top sticky left-[50px] z-10 bg-stone-50/90 border-r-2 border-r-stone-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] border-l-3 border-l-terracotta/40 w-[120px]">
+                                  <div className="flex flex-col gap-1 text-[10px] leading-tight w-full">
+                                    {(() => {
+                                      const fileObj = filesQueue.find(f => f.md5 === issue._fileMd5);
+                                      const fileName = fileObj ? fileObj.fileName : '手动添加';
+                                      const isManual = !issue._fileMd5;
+                                      const displayName = fileName.length > 100 ? (fileName.slice(0, 100) + '...') : fileName;
+                                      const ext = fileName.split('.').pop().toLowerCase();
+                                      let iconUrl = '';
+                                      if (ext === 'pdf') {
+                                        iconUrl = '/icons/pdf.svg';
+                                      } else if (ext === 'docx' || ext === 'doc') {
+                                        iconUrl = '/icons/word.svg';
+                                      }
+                                      return (
+                                        <span
+                                          className={"px-1.5 py-0.5 rounded border font-medium inline-block align-middle break-all whitespace-normal leading-normal text-[9px] " + (
+                                            isManual
+                                              ? 'bg-stone-100 text-stone-500 border-stone-200'
+                                              : 'bg-warm-sand/50 text-olive-gray border-border-cream/80'
+                                          )}
+                                          title={fileName}
+                                        >
+                                          {iconUrl ? (
+                                            <img
+                                              src={iconUrl}
+                                              alt={ext}
+                                              className="w-3.5 h-3.5 inline-block align-middle mr-1.5 object-contain"
+                                            />
+                                          ) : (
+                                            <span className="inline-block align-middle mr-1">📄</span>
+                                          )}
+                                          <span className="align-middle">{displayName}</span>
+                                        </span>
+                                      );
+                                    })()}
+                                    {(() => {
+                                      const hasMd5 = !!issue._fileMd5;
+                                      if (!hasMd5) return null;
+                                      const rawPage = issue._page;
+                                      const displayPage = rawPage ? ("第" + rawPage + "页") : '第1页';
+                                      return (
+                                        <span className="bg-orange-50 text-orange-700 border border-orange-200/60 px-6 py-0.5 rounded font-bold w-max text-[12px] inline-block mt-0.5 shadow-2xs">
+                                          {displayPage}
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
                                 </td>
                                 {fields.map((f, colIndex) => {
                                   const key = f.key || `field_${colIndex + 1}`;
@@ -2588,6 +2741,7 @@ export default function DocumentExtractor({ presetId = null }) {
                       </div>
                     )}
                   </section>
+
                 </div>
 
                 {/* Right column: Table credentials & mappings (1/3 width) */}
@@ -2680,40 +2834,6 @@ export default function DocumentExtractor({ presetId = null }) {
                           </div>
                         )}
                       </div>
-
-                      {/* 4. One-click execute push button */}
-                      <button
-                        onClick={pushToSpreadsheet}
-                        disabled={isPushing || !isTableConnected || extractedIssues.length === 0}
-                        className="w-full bg-terracotta hover:bg-terracotta-hover disabled:opacity-40 text-ivory text-xs font-bold py-3 rounded-lg shadow transition mt-2 flex items-center justify-center gap-1.5"
-                      >
-                        {isPushing ? (
-                          <>
-                            <Loader2 size={14} className="animate-spin" />
-                            <span>正在将数据写入云端多维表格...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>🚀 确认推送数据到云端多维表格</span>
-                          </>
-                        )}
-                      </button>
-
-                      {pushResult && (
-                        <div className={`p-3 rounded-lg text-xs leading-relaxed border mt-2 flex flex-col gap-1.5 ${pushResult.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-                          <span className="font-bold">${pushResult.message}</span>
-                          {pushResult.success && pushResult.link && (
-                            <a
-                              href={pushResult.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-terracotta font-bold hover:underline flex items-center gap-1"
-                            >
-                              <span>点击此处，立即在新页面中打开云端多维表格 ↗</span>
-                            </a>
-                          )}
-                        </div>
-                      )}
 
                     </div>
                   </section>
@@ -2941,7 +3061,7 @@ export default function DocumentExtractor({ presetId = null }) {
                         {extractedIssues.length > 0 && (
                           <button
                             onClick={exportToExcel}
-                            className="border border-stone-gray hover:border-near-black text-olive-gray hover:text-near-black px-3.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1 transition bg-white shadow-xs"
+                            className="bg-terracotta hover:bg-terracotta-hover text-ivory px-3.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1 transition shadow-sm border border-transparent"
                           >
                             <Download size={12} />
                             <span>导出为 Excel</span>
@@ -2989,8 +3109,8 @@ export default function DocumentExtractor({ presetId = null }) {
                                     const fileObj = filesQueue.find(f => f.md5 === issue._fileMd5);
                                     const fileName = fileObj ? fileObj.fileName : '手动添加';
                                     const isManual = !issue._fileMd5;
-                                    // 10 个字符以上触发 truncate 截断，且支持文件名较长时折行换行显示
-                                    const displayName = fileName.length > 10 ? (fileName.slice(0, 10) + '...') : fileName;
+                                    // 100 个字符以上触发 truncate 截断，且支持文件名较长时折行换行显示
+                                    const displayName = fileName.length > 100 ? (fileName.slice(0, 100) + '...') : fileName;
                                     // 根据文件后缀判定渲染 pdf.svg 或者是 word.svg
                                     const ext = fileName.split('.').pop().toLowerCase();
                                     let iconUrl = '';
@@ -3025,9 +3145,9 @@ export default function DocumentExtractor({ presetId = null }) {
                                     const hasMd5 = !!issue._fileMd5;
                                     if (!hasMd5) return null;
                                     const rawPage = issue._page;
-                                    const displayPage = rawPage ? ("P. " + rawPage) : 'P. 1';
+                                    const displayPage = rawPage ? ("第" + rawPage + "页") : '第1页';
                                     return (
-                                      <span className="bg-orange-50 text-orange-700 border border-orange-200/60 px-2 py-0.5 rounded font-bold w-max text-[9px] inline-block mt-0.5 shadow-2xs">
+                                      <span className="bg-orange-50 text-orange-700 border border-orange-200/60 px-6 py-0.5 rounded font-bold w-max text-[12px] inline-block mt-0.5 shadow-2xs">
                                         {displayPage}
                                       </span>
                                     );
@@ -3139,9 +3259,9 @@ export default function DocumentExtractor({ presetId = null }) {
                     setActiveStep(3);
                     startExtraction();
                   }}
-                  disabled={filesQueue.filter(f => f.status === 'done').length === 0}
-                  className="px-4 py-2.5 rounded text-xs font-semibold border border-terracotta/40 bg-terracotta/10 text-terracotta hover:bg-terracotta/20 transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
-                  title="直接跳过第 2 步配置字段，以默认的字段进行解析"
+                  disabled={isDetectingFields || filesQueue.filter(f => f.status === 'done').length === 0}
+                  className="px-4 py-2.5 rounded text-xs font-semibold border border-terracotta/40 bg-terracotta/10 text-terracotta hover:bg-terracotta/20 transition flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed shadow-xs"
+                  title={isDetectingFields ? "请等待自动识别字段完成" : "直接跳过配置字段，以默认的字段进行解析"}
                 >
                   <Sparkles size={14} />
                   <span>跳过配置字段，立即解析</span>
@@ -3166,8 +3286,9 @@ export default function DocumentExtractor({ presetId = null }) {
             {activeStep === 2 && (
               <button
                 onClick={startExtraction}
-                disabled={isExtracting || filesQueue.filter(f => f.status === 'done').length === 0}
-                className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-8 py-2.5 rounded transition flex items-center gap-1.5 shadow-sm disabled:opacity-40"
+                disabled={isExtracting || isDetectingFields || filesQueue.filter(f => f.status === 'done').length === 0}
+                className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-8 py-2.5 rounded transition flex items-center gap-1.5 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                title={isDetectingFields ? "请等待自动识别字段完成" : ""}
               >
                 {isExtracting ? (
                   <>
@@ -3201,7 +3322,7 @@ export default function DocumentExtractor({ presetId = null }) {
                     className="bg-green-700 hover:bg-green-800 text-white text-xs font-semibold px-6 py-2.5 rounded transition flex items-center gap-1.5 shadow-md hover:scale-[1.01] duration-150 whitespace-nowrap"
                   >
                     <CheckCircle2 size={13} className="text-green-200" />
-                    <span>🎉 写入成功！点击前往多维表格查看结果 ↗</span>
+                    <span>🎉 写入成功！点击前往多维表格查看结果 </span>
                   </a>
                 ) : (
                   <button
@@ -3211,6 +3332,41 @@ export default function DocumentExtractor({ presetId = null }) {
                   >
                     {isPushing && <Loader2 size={12} className="animate-spin" />}
                     <span>{isPushing ? '正在推送数据...' : '已核对识别结果，一键推送'}</span>
+                  </button>
+                )}
+
+                {pushResult && !pushResult.success && (
+                  <div className="border rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs shadow-sm max-w-[280px] border-red-200 bg-red-50 text-error-crimson">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-600" />
+                    <div className="flex flex-col text-[11px] leading-tight min-w-0">
+                      <span className="font-bold">写入失败</span>
+                      <span className="opacity-90 truncate">{pushResult.message}</span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeStep === 4 && (
+              <>
+                {pushResult?.success === true ? (
+                  <a
+                    href={pushResult.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-green-700 hover:bg-green-800 text-white text-xs font-semibold px-6 py-2.5 rounded transition flex items-center gap-1.5 shadow-md hover:scale-[1.01] duration-150 whitespace-nowrap"
+                  >
+                    <CheckCircle2 size={13} className="text-green-200" />
+                    <span>🎉 写入成功！点击前往多维表格查看结果 </span>
+                  </a>
+                ) : (
+                  <button
+                    onClick={pushToSpreadsheet}
+                    disabled={isPushing || !isTableConnected || extractedIssues.length === 0}
+                    className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-8 py-2.5 rounded transition disabled:opacity-40 flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+                  >
+                    {isPushing && <Loader2 size={12} className="animate-spin" />}
+                    <span>{isPushing ? '正在推送数据...' : '确认推送'}</span>
                   </button>
                 )}
 

@@ -135,7 +135,7 @@ async function autoDetectFieldsHandler(request) {
     const openai = new OpenAI({
       apiKey: activeApiKey,
       baseURL: llmConfig.baseUrl || 'https://api.moonshot.cn/v1',
-      timeout: 20000 // 智能推演配置为 20 秒超时保护
+      timeout: 60000 // 放宽至 60 秒超时保护
     });
 
     const isVision = isVisionModel(llmConfig.model) && imageBase64;
@@ -179,57 +179,82 @@ async function autoDetectFieldsHandler(request) {
       });
     }
 
-    // 5. 发送请求给大模型进行字段推演
+    // 5. 发送请求给大模型进行字段推演 (流式响应)
     logger.info({
       event: 'AUTO_DETECT_FIELDS_START',
       model: llmConfig.model,
       isVision
-    }, `🔮 启动 AI 一键自动识别字段，文档: ${record.fileName}`);
+    }, `🔮 启动 AI 一键自动识别字段流式解析，文档: ${record.fileName}`);
 
-    const response = await openai.chat.completions.create({
+    const stream = await openai.chat.completions.create({
       model: llmConfig.model || 'kimi-k2.7-code',
       messages,
-      response_format: { type: 'json_object' }
+      response_format: { type: 'json_object' },
+      stream: true
     });
 
-    const rawResult = response.choices[0]?.message?.content || '';
-    let parsedJson = null;
+    const encoder = new TextEncoder();
+    const customReadable = new ReadableStream({
+      async start(controller) {
+        let completeText = '';
+        try {
+          for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            completeText += content;
+            controller.enqueue(encoder.encode(JSON.stringify({ type: 'chunk', text: content }) + '\n'));
+          }
 
-    try {
-      parsedJson = JSON.parse(rawResult.trim());
-    } catch (parseErr) {
-      logger.error({
-        event: 'AUTO_DETECT_JSON_PARSE_FAILED',
-        rawResult
-      }, '解析大模型返回的字段 JSON 格式失败');
-      throw new Error(`模型返回的数据格式不合规: ${parseErr.message}`);
-    }
+          let parsedJson = null;
+          try {
+            parsedJson = JSON.parse(completeText.trim());
+          } catch (parseErr) {
+            controller.enqueue(encoder.encode(JSON.stringify({ type: 'error', error: `大模型返回的 JSON 解析失败: ${parseErr.message}` }) + '\n'));
+            controller.close();
+            return;
+          }
 
-    const fieldsList = parsedJson.fields || [];
-    if (!Array.isArray(fieldsList) || fieldsList.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: '⚠️ AI 智能推演结束，未能从当前上传的文档首页中分析出合适的提取字段，请尝试手动添加。'
-      });
-    }
+          const fieldsList = parsedJson.fields || [];
+          if (!Array.isArray(fieldsList) || fieldsList.length === 0) {
+            controller.enqueue(encoder.encode(JSON.stringify({ type: 'error', error: '⚠️ 模型未能给出有效的字段定义。' }) + '\n'));
+            controller.close();
+            return;
+          }
 
-    // 清洗和校验 fieldsList 字段 (保证 isAdvancedOpen 为 false)
-    const cleanedFields = fieldsList.map(f => ({
-      key: (f.key || '').replace(/[^a-zA-Z0-9]/g, '') || `field_${Math.random().toString(36).substr(2, 5)}`,
-      label: f.label || '新字段',
-      desc: f.desc || '',
-      example: f.example || '',
-      isAdvancedOpen: false
-    }));
+          const cleanedFields = fieldsList.map(f => ({
+            key: (f.key || '').replace(/[^a-zA-Z0-9]/g, '') || `field_${Math.random().toString(36).substr(2, 5)}`,
+            label: f.label || '新字段',
+            desc: f.desc || '',
+            example: f.example || '',
+            isAdvancedOpen: false
+          }));
 
-    logger.info({
-      event: 'AUTO_DETECT_FIELDS_SUCCESS',
-      detectedCount: cleanedFields.length
-    }, `🔮 AI 一键自动识别字段成功，生成了 ${cleanedFields.length} 个字段`);
+          const promptTokens = Math.round(JSON.stringify(messages).length / 1.5);
+          const completionTokens = Math.round(completeText.length / 1.5);
 
-    return NextResponse.json({
-      success: true,
-      fields: cleanedFields
+          controller.enqueue(encoder.encode(JSON.stringify({
+            type: 'done',
+            fields: cleanedFields,
+            usage: {
+              promptTokens,
+              completionTokens,
+              totalTokens: promptTokens + completionTokens
+            }
+          }) + '\n'));
+          controller.close();
+
+        } catch (streamErr) {
+          controller.enqueue(encoder.encode(JSON.stringify({ type: 'error', error: streamErr.message }) + '\n'));
+          controller.close();
+        }
+      }
+    });
+
+    return new Response(customReadable, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      }
     });
 
   } catch (err) {

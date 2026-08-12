@@ -17,15 +17,15 @@
   "fields": [
     {
       "key": "field1",
-      "label": "问题描述",
-      "desc": "问题情况的简要概述",
+      "label": "文档主题",
+      "desc": "",
       "example": "",
       "isAdvancedOpen": false
     },
     {
       "key": "field2",
-      "label": "问题类型",
-      "desc": "安全问题分类，如临时用电、高处作业",
+      "label": "主要内容概述",
+      "desc": "",
       "example": "",
       "isAdvancedOpen": false
     }
