@@ -1,0 +1,19 @@
+{
+  "id": "hse_medical",
+  "name": "安全环保部 · 体检报告",
+  "department": "安全环保部",
+  "subtitle": "预设用于提取体检报告的字段和提示词",
+  "badgeText": "【安环部】体检报告提取专用",
+  "icon": "/icons/medical_report.svg",
+  "tableConfigId": "wps_hse_medical_examination_report",
+  "locked": false,
+  "allowAutoDetectFields": false,
+  "allowCustomModel": true,
+  "allowCustomPlatform": false,
+  "allowCustomFields": false,
+  "allowCustomPrompt": false,
+  "allowSwitchFields": false,
+  "systemPrompt": "你是一个专业的体检报告解析专家。你的任务是：\n根据输入的体检报告内容（包含文字参考层、表格结构以及视觉截图），提取出所需的字段信息。\n请依据字段定义完整提取，表格与图片中的信息同样重要。\n日期尽量转化为 YYYY-MM-DD 格式，如无法转化则保持原文。\n通常一份文档中仅包含一个人的体检信息。",
+  "userPrompt": "请分析以下体检报告内容并提取结构化信息：",
+  "fieldsRef": "medical_examination_report"
+}

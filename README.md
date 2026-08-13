@@ -139,13 +139,44 @@ DocEx 采用轻量化、静态 JSON 驱动的设计理念，大部分核心环�
 
 在正式将 DocEx 部署至生产服务器前，请务必阅读并调整以下环境参数：
 
-### 1. PM2 启动限制：单进程模式运行
+### 1. PM2 生产环境部署与启动 (4003 端口)
 
-由于本项目使用基于本地文件的轻量 JSON 存储，为防多进程同时写入 `data/db.json` 发生文件锁死及冲突，**请确保 PM2 以单实例（Single instance）运行**：
+由于本项目使用基于本地文件的轻量 JSON 存储，为防多进程同时写入 `data/db.json` 发生文件锁死及冲突，**请确保 PM2 以单实例（Single instance）运行**。
 
+项目已预置 [ecosystem.config.cjs](file:///c:/Users/gaoft/Documents/CodeSpace/docex/ecosystem.config.cjs)，其中已默认指定单进程运行、应用名称 `docex` 并在 `4003` 端口上监听。
+
+我们推荐以下两种部署启动方式：
+
+#### 方案 A：使用内置的 ecosystem 配置启动（推荐，配合 Standalone 优化版）
+在 Next.js 的 standalone 独立打包模式下，需要将静态资源拷贝至打包目录以保证界面样式正常：
 ```bash
-pm2 start npm --name "docex" --run dev
+# 1. 运行生产打包
+pnpm build
+
+# 2. 拷贝静态资源到独立部署目录
+cp -r public .next/standalone/
+cp -r .next/static .next/standalone/.next/
+
+# 3. 拷贝 PM2 配置文件并启动
+cp ecosystem.config.cjs .next/standalone/
+cd .next/standalone
+pm2 start ecosystem.config.cjs
 ```
+*(如果是 Windows 环境，请使用 `xcopy` 替代 `cp -r` 拷贝命令)*
+
+#### 方案 B：根目录下快捷启动（免拷贝，适合极速部署）
+直接在项目根目录下通过 PM2 调用 pnpm start 并指定端口的环境变量：
+```bash
+# 1. 运行生产打包
+pnpm build
+
+# 2. 启动 PM2 并透传 4003 端口
+PORT=4003 pm2 start pnpm --name "docex" -- start
+```
+*(Windows 下启动命令为：`pm2 start pnpm --name "docex" --env PORT=4003 -- start`)*
+
+启动成功后，建议运行 `pm2 save` 保存进程列表以防服务器重启丢失。
+
 
 ### 2. Nginx 反向代理参数调整
 

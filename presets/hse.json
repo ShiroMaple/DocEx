@@ -1,15 +1,15 @@
 {
   "id": "hse",
-  "name": "智能结构化提取 · 安全环保部",
+  "name": "安全环保部 · 安全问题文档",
   "department": "安全环保部",
   "subtitle": "预设用于提取安全检查报告的字段和提示词",
   "badgeText": "【安环部】安全问题文档提取专用",
-  "icon": "🛡️",
+  "icon": "/icons/safety_problem.svg",
   "tableConfigId": "wps_hse",
   "locked": false,
   "allowAutoDetectFields": false,
   "allowCustomModel": true,
-  "allowCustomPlatform": true,
+  "allowCustomPlatform": false,
   "allowCustomFields": false,
   "allowCustomPrompt": false,
   "allowSwitchFields": false,
@@ -21,14 +21,5 @@
       "name": "建安承包商过滤",
       "condition": "if (!record.contractor || record.contractor === '无' || record.contractor === '未提及') return true; return record.contractor.includes('建安');"
     }
-  ],
-  "fieldMapping": {
-    "项目名称": "projectName",
-    "问题类型": "issueType",
-    "检查区域": "inspectionArea",
-    "问题描述": "description",
-    "整改要求": "rectificationRequirement",
-    "检查人员": "inspector",
-    "检查日期": "inspectionDate"
-  }
+  ]
 }

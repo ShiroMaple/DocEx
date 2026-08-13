@@ -226,209 +226,41 @@
   {
     "id": "medical_examination_report",
     "name": "体检报告提取",
-    "description": "用于提取体检报告信息的预设字段配置，条件参照承包商体检要求及体检中不得录用情形",
+    "description": "用于提取体检报告信息的预设字段配置",
     "fields": [
       {
-        "key": "name",
+        "key": "field_1",
         "label": "姓名",
-        "desc": "体检报告被检对象的姓名",
-        "example": "陆仁甲",
+        "desc": "体验报告被检对象的姓名",
+        "example": "张三",
         "isAdvancedOpen": false
       },
       {
-        "key": "reportNo",
-        "label": "体检报告编号",
-        "desc": "体检报告顶部或封面处的体检编号（条形码下方数字、表头\"编号\"字段），忽略前缀\"体检编号：\"、\"编号：\"及空格。",
-        "example": "2613691",
+        "key": "field_2",
+        "label": "收缩压",
+        "desc": "",
+        "example": "",
         "isAdvancedOpen": false
       },
       {
-        "key": "gender",
-        "label": "性别",
-        "desc": "被检对象的性别，输出\"男\"或\"女\"。",
-        "example": "男",
+        "key": "field_3",
+        "label": "舒张压",
+        "desc": "",
+        "example": "",
         "isAdvancedOpen": false
       },
       {
-        "key": "age",
-        "label": "年龄",
-        "desc": "被检对象的年龄（岁），只保留数字。",
-        "example": "54",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "birthDate",
-        "label": "出生日期",
-        "desc": "被检对象的出生日期，格式 YYYY-MM-DD。",
-        "example": "1972-03-02",
-        "isAdvancedOpen": true
-      },
-      {
-        "key": "phone",
-        "label": "联系电话",
-        "desc": "被检对象的电话号码，保留数字串。",
-        "example": "18753830992",
-        "isAdvancedOpen": true
-      },
-      {
-        "key": "company",
-        "label": "单位",
-        "desc": "被检对象所属的单位/公司名称。",
-        "example": "外单位体检",
-        "isAdvancedOpen": true
-      },
-      {
-        "key": "department",
-        "label": "部门",
-        "desc": "被检对象所属的部门。",
-        "example": "安全环保部",
-        "isAdvancedOpen": true
-      },
-      {
-        "key": "workType",
-        "label": "体检作业类别",
-        "desc": "被检对象申请的作业类别，电工作业、高处作业、压力容器作业、职业机动车驾驶作业、其它，多选用逗号分隔。",
-        "example": "高处作业",
-        "isAdvancedOpen": true
-      },
-      {
-        "key": "examinationDate",
-        "label": "体检日期",
-        "desc": "本次体检的检查日期或初检时间，格式 YYYY-MM-DD，优先取心电图/各科记录中最晚的检查日期。",
-        "example": "2026-05-13",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "height",
-        "label": "身高",
-        "desc": "身高数值，单位 cm。",
-        "example": "173",
-        "isAdvancedOpen": true
-      },
-      {
-        "key": "weight",
-        "label": "体重",
-        "desc": "体重数值，单位 kg。",
-        "example": "63",
-        "isAdvancedOpen": true
-      },
-      {
-        "key": "BMI",
-        "label": "BMI",
-        "desc": "体质指数 BMI 数值。",
-        "example": "21",
-        "isAdvancedOpen": true
-      },
-      {
-        "key": "systolicBP",
-        "label": "收缩压(上压)",
-        "desc": "血压测量中的收缩压/上压数值，单位 mmHg。",
-        "example": "113",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "diastolicBP",
-        "label": "舒张压(下压)",
-        "desc": "血压测量中的舒张压/下压数值，单位 mmHg。",
-        "example": "60",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "bloodPressureJudgment",
-        "label": "血压判定",
-        "desc": "依据血压值自动判定：上压<140且下压<90 记\"合格\"；上压 140-159 或下压 90-99 记\"偏高\"；上压>=160 或下压>=100 记\"不合格（高血压）\"。",
-        "example": "合格",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "heartRate",
-        "label": "心率/脉率",
-        "desc": "心率或脉率数值，单位 次/分钟。",
-        "example": "68",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "heartRateJudgment",
-        "label": "心率判定",
-        "desc": "依据心率自动判定：50-110 记\"合格\"；<50 或 >110 记\"不合格\"。",
-        "example": "合格",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "leftEyeVision",
+        "key": "field_4",
         "label": "左眼视力",
-        "desc": "左眼裸眼视力或矫正视力数值。",
-        "example": "1.0",
+        "desc": "",
+        "example": "",
         "isAdvancedOpen": false
       },
       {
-        "key": "rightEyeVision",
+        "key": "field_5",
         "label": "右眼视力",
-        "desc": "右眼裸眼视力或矫正视力数值。",
-        "example": "0.8",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "visionJudgment",
-        "label": "矫正视力判定",
-        "desc": "依据双眼视力判定：任一眼矫正视力<0.8 记\"不合格（高度近视/视力不达标）\"；两眼均>=0.8 记\"合格\"。",
-        "example": "合格",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "colorVision",
-        "label": "色觉",
-        "desc": "色觉检查结果，原文摘录五官科\"色觉\"项（如\"正常\"、\"红绿色盲\"等），用于判定是否红绿色盲。",
-        "example": "正常",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "limbsExamination",
-        "label": "外科-四肢",
-        "desc": "外科\"四肢\"或\"四肢残缺\"检查项结果，原文摘录（如\"无\"、\"无缺失\"等），用于判定是否明显残疾。",
-        "example": "无",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "ecgConclusion",
-        "label": "心电图结论",
-        "desc": "心电图最终诊断提示（如\"窦性心律\"、\"窦性心动过速\"、\"不完全性右束支传导阻滞\"等），原文摘录，用于筛查房性早搏、室性早搏、传导阻滞、风湿性心脏病、心肌病、冠心病、先天性心脏病等。",
-        "example": "窦性心律",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "ultrasoundConclusion",
-        "label": "彩超结论",
-        "desc": "彩超（肝胆脾胰肾）超声提示，原文摘录，用于筛查器官缺失、多囊肾、肝糜烂性病变、各种恶性肿瘤、肝硬化等。",
-        "example": "肝内钙化灶",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "conclusionAndAdvice",
-        "label": "体检结论及建议",
-        "desc": "体检反馈表\"体检结论及建议\"或\"主检结论\"栏的全部建议和异常项，原文摘录，多行可保留换行或用分号分隔。",
-        "example": "1、血压偏高；2、超重；3、窦性心动过速",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "occupationalDiseaseHistory",
-        "label": "职业病既往史",
-        "desc": "既往职业病史（询问表\"既往史\"或主诉结论中的噪声性耳聋、尘肺病等），若未提及则记\"无\"。",
-        "example": "无",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "disqualificationItems",
-        "label": "不得录用情形",
-        "desc": "对照\"体检中发现有以下情况，不得录用\"逐项判定的结果列表，列出所有触发的项目（如\"高血压\"、\"红绿色盲\"、\"窦性心动过速（心率>110）\"等），无任何触发则记\"无\"。",
-        "example": "高血压；窦性心动过速（心率>110）；左肾囊肿",
-        "isAdvancedOpen": false
-      },
-      {
-        "key": "overallJudgment",
-        "label": "体检综合判定",
-        "desc": "对承包商体检录用要求的综合结论：若\"不得录用情形\"字段非\"无\"则输出\"不合格：<触发的具体条款>\"；否则输出\"合格\"。",
-        "example": "不合格：高血压；窦性心动过速（心率>110）；左肾囊肿",
+        "desc": "",
+        "example": "",
         "isAdvancedOpen": false
       }
     ]

@@ -86,3 +86,75 @@ global.DOMMatrix = canvas.DOMMatrix;
 | **缓存/临时写入** | 独立放置在构建包之外（如根目录的 `data/`） | 避免写入 `.next/` 目录内，每次部署都会被擦除 |
 | **Native 依赖** | 显式声明到 `serverExternalPackages` 数组中 | 避免让 Turbopack/Webpack 尝试混淆打包底层 `.node` 模块 |
 | **动态资源加载** | 在 build 阶段自动拷贝至 `public/` 目录进行分发 | 避免在代码中通过相对 `node_modules` 路径进行运行时读取 |
+
+---
+
+## 🚀 四、 生产环境 PM2 部署实战指南（以 4003 端口为例）
+
+针对本项目，我们在生产环境中推荐使用 **PM2 (Process Manager 2)** 来管理 Next.js 独立运行实例。由于使用轻量本地 JSON 数据存储，PM2 必须以**单实例（Single instance）**模式运行以避免文件写入锁冲突。
+
+以下是两种生产环境的部署方案：
+
+### 1. 方案 A：Standalone 独立运行包启动（推荐 🌟）
+
+此方案能极大精简包体体积，仅需将静态资源手动同步至独立包目录内即可启动。
+
+#### 命令行步骤：
+1. **运行生产环境构建**：
+   ```bash
+   pnpm build
+   ```
+2. **复制静态资源到部署包（Next.js standalone 限制，必须手动补齐）**：
+   * **Linux / macOS**:
+     ```bash
+     cp -r public .next/standalone/
+     cp -r .next/static .next/standalone/.next/
+     ```
+   * **Windows (PowerShell)**:
+     ```powershell
+     xcopy /E /I public .next\standalone\public
+     xcopy /E /I .next\static .next\standalone\.next\static
+     ```
+3. **将项目根目录的 PM2 配置文件复制至部署包并运行**：
+   项目内置的 `ecosystem.config.cjs` 已经配置好了单实例模式与 `4003` 监听端口。
+   * **Linux / macOS**:
+     ```bash
+     cp ecosystem.config.cjs .next/standalone/
+     cd .next/standalone
+     pm2 start ecosystem.config.cjs
+     ```
+   * **Windows (PowerShell)**:
+     ```powershell
+     copy ecosystem.config.cjs .next\standalone\
+     cd .next\standalone
+     pm2 start ecosystem.config.cjs
+     ```
+
+---
+
+### 2. 方案 B：项目根目录一键快捷启动（免拷贝）
+
+如果不希望在构建后执行手动文件拷贝操作，可以直接在项目根目录下通过 PM2 调用 `pnpm` 包管理器的 `start` 脚本来执行部署，并显式指定端口。
+
+#### 命令行步骤：
+1. **运行生产环境构建**：
+   ```bash
+   pnpm build
+   ```
+2. **使用 PM2 启动生产服务（注入 4003 端口）**：
+   * **Linux / macOS**:
+     ```bash
+     PORT=4003 pm2 start pnpm --name "docex" -- start
+     ```
+   * **Windows (PowerShell/CMD)**:
+     ```bash
+     pm2 start pnpm --name "docex" --env PORT=4003 -- start
+     ```
+
+### 3. 持久化保存进程
+
+启动完毕后，请务必执行以下命令将进程信息写入磁盘，以保证服务器重启后 PM2 能自动恢复启动：
+```bash
+pm2 save
+```
+

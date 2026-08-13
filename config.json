@@ -63,10 +63,19 @@
       },
       {
         "id": "wps_hse",
-        "name": "安全环保部_WPS归档表",
+        "name": "安全环保部_安全问题表",
         "platform": "wps",
         "baseUrl": "https://365.kdocs.cn/l/",
         "tableId": "caa23eb4LQBg",
+        "appIdEnv": "HSE_WPS_APP_ID",
+        "appSecretEnv": "HSE_WPS_APP_SECRET"
+      },
+      {
+        "id": "wps_hse_medical_examination_report",
+        "name": "安全环保部_体检报告表",
+        "platform": "wps",
+        "baseUrl": "https://365.kdocs.cn/l/",
+        "tableId": "cuIVvBQhPIRs",
         "appIdEnv": "HSE_WPS_APP_ID",
         "appSecretEnv": "HSE_WPS_APP_SECRET"
       }

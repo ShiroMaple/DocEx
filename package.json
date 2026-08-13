@@ -20,7 +20,6 @@
   "author": "",
   "license": "GPL-3.0-only",
   "dependencies": {
-    "@google/genai": "^2.10.0",
     "@napi-rs/canvas": "^1.0.2",
     "axios": "^1.18.1",
     "dotenv": "^17.4.2",

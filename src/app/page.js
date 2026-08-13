@@ -17,7 +17,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UploadCloud,
@@ -39,7 +39,8 @@ import {
   X,
   ArrowRight,
   ArrowLeft,
-  Download
+  Download,
+  Eye
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -58,6 +59,45 @@ const ImageIcon = ({ className = "w-6 h-6" }) => (
     IMG
   </span>
 );
+
+/**
+ * 动态计算列宽：
+ * 根据该列表头名称与表格所有数据行的最长内容计算；
+ * 规则：最大宽度不超过 10 个中文字符 (~184px)，超出时内容换行；最小宽度保证短字段 (如日期 1972-03-25 / 姓名) 不换行 (min 115px)。
+ */
+const getColWidthPx = (fieldKey, labelText, issues = []) => {
+  let maxUnits = 0;
+
+  // 计算表头长度 (1 中文字符 = 1 单元, 1 ASCII 字符 = 0.6 单元)
+  const labelStr = labelText || '';
+  let labelUnits = 0;
+  for (let i = 0; i < labelStr.length; i++) {
+    labelUnits += labelStr.charCodeAt(i) > 255 ? 1 : 0.6;
+  }
+  maxUnits = Math.max(maxUnits, labelUnits);
+
+  // 计算表格内容行的最长长度
+  if (Array.isArray(issues)) {
+    for (const issue of issues) {
+      if (!issue) continue;
+      const val = issue[fieldKey];
+      if (val !== undefined && val !== null && val !== '') {
+        const str = String(val);
+        let len = 0;
+        for (let i = 0; i < str.length; i++) {
+          len += str.charCodeAt(i) > 255 ? 1 : 0.6;
+        }
+        if (len > maxUnits) maxUnits = len;
+      }
+    }
+  }
+
+  // 1 中文字符 ≈ 14px，基础 padding/border 偏移 = 44px
+  // 最小列宽 115px (保证如 1972-03-25 或 4字表头 绝不换行)
+  // 最大列宽 184px (严格对应 10 个中文字符 10 * 14 + 44px)
+  const calcPx = Math.ceil(maxUnits * 14 + 44);
+  return Math.min(184, Math.max(115, calcPx));
+};
 
 export default function DocumentExtractor({ presetId = null }) {
   // ── Preset State ──
@@ -165,8 +205,40 @@ export default function DocumentExtractor({ presetId = null }) {
   const totalFilteredCount = Object.values(fileFilteredCountMap).reduce((sum, count) => sum + count, 0);
   const [fileEstPromptTokensMap, setFileEstPromptTokensMap] = useState({});
   const [elapsedTime, setElapsedTime] = useState(null);
-  const [tokenUsage, setTokenUsage] = useState(null);
+  const [prepTokenUsage, setPrepTokenUsage] = useState({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+  const [historicalTokenUsage, setHistoricalTokenUsage] = useState({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+  const [activeFileTokenUsage, setActiveFileTokenUsage] = useState({});
+
+  const tokenUsage = useMemo(() => {
+    const activePrompt = Object.values(activeFileTokenUsage).reduce((sum, item) => sum + (item.promptTokens || 0), 0);
+    const activeCompletion = Object.values(activeFileTokenUsage).reduce((sum, item) => sum + (item.completionTokens || 0), 0);
+
+    const totalPrompt = prepTokenUsage.promptTokens + historicalTokenUsage.promptTokens + activePrompt;
+    const totalCompletion = prepTokenUsage.completionTokens + historicalTokenUsage.completionTokens + activeCompletion;
+    const totalTotal = totalPrompt + totalCompletion;
+
+    if (totalTotal === 0) return null;
+    return {
+      promptTokens: totalPrompt,
+      completionTokens: totalCompletion,
+      totalTokens: totalTotal
+    };
+  }, [prepTokenUsage, historicalTokenUsage, activeFileTokenUsage]);
   const [validationErrors, setValidationErrors] = useState({}); // { rowIndex_fieldKey: errorText }
+  const [activeReviewIndex, setActiveReviewIndex] = useState(null);
+  const [detailFormState, setDetailFormState] = useState({});
+
+  const handleDetailFieldChange = (key, val) => {
+    setDetailFormState(prev => ({ ...prev, [key]: val }));
+    updateIssueCell(activeReviewIndex, key, val);
+  };
+
+  // ── Dynamic Column Widths for Step 3 and Step 4 ──
+  const step4FieldWidths = fields.map((f, idx) => getColWidthPx(f.key || `field_${idx + 1}`, f.label || `列_${idx + 1}`, extractedIssues));
+  const step4TotalWidth = 50 + 120 + step4FieldWidths.reduce((a, b) => a + b, 0);
+
+  const step3FieldWidths = fields.map((f, idx) => getColWidthPx(f.key || `field_${idx + 1}`, f.label || `列_${idx + 1}`, extractedIssues));
+  const step3TotalWidth = 50 + 100 + step3FieldWidths.reduce((a, b) => a + b, 0) + 80;
   const [isPushing, setIsPushing] = useState(false);
   const [pushResult, setPushResult] = useState(null);
   const [rawLlmResponse, setRawLlmResponse] = useState('');
@@ -242,16 +314,11 @@ export default function DocumentExtractor({ presetId = null }) {
                   showToast(`🔮 智能推荐成功！一键生成并覆盖了 ${data.fields.length} 个核心字段定义。`);
 
                   if (data.usage) {
-                    setTokenUsage(prev => {
-                      const oldPrompt = prev?.promptTokens || 0;
-                      const oldCompletion = prev?.completionTokens || 0;
-                      const oldTotal = prev?.totalTokens || 0;
-                      return {
-                        promptTokens: oldPrompt + (data.usage.promptTokens || 0),
-                        completionTokens: oldCompletion + (data.usage.completionTokens || 0),
-                        totalTokens: oldTotal + (data.usage.totalTokens || 0)
-                      };
-                    });
+                    setPrepTokenUsage(prev => ({
+                      promptTokens: prev.promptTokens + (data.usage.promptTokens || 0),
+                      completionTokens: prev.completionTokens + (data.usage.completionTokens || 0),
+                      totalTokens: prev.totalTokens + (data.usage.totalTokens || 0)
+                    }));
                   }
                 } else {
                   showToast('⚠️ 智能推演完毕，模型未能从文档中识别到合适的提取字段。', 'error');
@@ -832,16 +899,11 @@ export default function DocumentExtractor({ presetId = null }) {
       setCustomPrompt(data.optimizedPrompt);
       showToast('AI 提示词优化成功！');
       if (data.usage) {
-        setTokenUsage(prev => {
-          const oldPrompt = prev?.promptTokens || 0;
-          const oldCompletion = prev?.completionTokens || 0;
-          const oldTotal = prev?.totalTokens || 0;
-          return {
-            promptTokens: oldPrompt + (data.usage.promptTokens || 0),
-            completionTokens: oldCompletion + (data.usage.completionTokens || 0),
-            totalTokens: oldTotal + (data.usage.totalTokens || 0)
-          };
-        });
+        setPrepTokenUsage(prev => ({
+          promptTokens: prev.promptTokens + (data.usage.promptTokens || 0),
+          completionTokens: prev.completionTokens + (data.usage.completionTokens || 0),
+          totalTokens: prev.totalTokens + (data.usage.totalTokens || 0)
+        }));
       }
     } catch (e) {
       alert(`优化失败: ${e.message}`);
@@ -1100,7 +1162,8 @@ export default function DocumentExtractor({ presetId = null }) {
     setFileFilteredCountMap({});
     setFileEstPromptTokensMap({});
     setElapsedTime(null);
-    setTokenUsage({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+    setHistoricalTokenUsage({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+    setActiveFileTokenUsage({});
     setPushResult(null);
     setRawLlmResponse('');
 
@@ -1168,13 +1231,10 @@ export default function DocumentExtractor({ presetId = null }) {
         const updated = Object.assign({}, prev, { [file.md5]: estPromptTokens });
         return updated;
       });
-      totalPromptTokens += estPromptTokens;
-      totalTotalTokens += estPromptTokens;
-      setTokenUsage({
-        promptTokens: totalPromptTokens,
-        completionTokens: totalCompletionTokens,
-        totalTokens: totalTotalTokens
-      });
+      setActiveFileTokenUsage(prev => ({
+        ...prev,
+        [file.md5]: { promptTokens: estPromptTokens, completionTokens: 0 }
+      }));
 
       try {
         const res = await fetch('/api/extract', {
@@ -1234,33 +1294,31 @@ export default function DocumentExtractor({ presetId = null }) {
 
                 // 输出 Token 随字数增长动态计算逻辑
                 const estCompletion = Math.round(fileRawContent.length * 1.3);
-                const diffCompletion = estCompletion - lastEstCompletion;
-                lastEstCompletion = estCompletion;
-
-                totalCompletionTokens += diffCompletion;
-                totalTotalTokens += diffCompletion;
-                setTokenUsage({
-                  promptTokens: totalPromptTokens,
-                  completionTokens: totalCompletionTokens,
-                  totalTokens: totalTotalTokens
+                setActiveFileTokenUsage(prev => {
+                  const existing = prev[file.md5] || { promptTokens: 0, completionTokens: 0 };
+                  return {
+                    ...prev,
+                    [file.md5]: {
+                      ...existing,
+                      completionTokens: estCompletion
+                    }
+                  };
                 });
 
               } else if (line.type === 'estimated') {
                 // 精准估算输入 Token 并实时覆盖更新
                 const realEst = line.promptTokens || 0;
+                setActiveFileTokenUsage(prev => {
+                  const existing = prev[file.md5] || { promptTokens: 0, completionTokens: 0 };
+                  return {
+                    ...prev,
+                    [file.md5]: {
+                      ...existing,
+                      promptTokens: realEst
+                    }
+                  };
+                });
                 setFileEstPromptTokensMap(prev => {
-                  const oldEstForThisFile = prev[file.md5] || estPromptTokens;
-                  totalPromptTokens = totalPromptTokens - oldEstForThisFile + realEst;
-                  totalTotalTokens = totalTotalTokens - oldEstForThisFile + realEst;
-                  setTokenUsage(tu => {
-                    const currentPrompt = totalPromptTokens;
-                    const currentComp = tu ? (tu.completionTokens || 0) : 0;
-                    return {
-                      promptTokens: currentPrompt,
-                      completionTokens: currentComp,
-                      totalTokens: currentPrompt + currentComp
-                    };
-                  });
                   const updated = Object.assign({}, prev, { [file.md5]: realEst });
                   return updated;
                 });
@@ -1281,18 +1339,13 @@ export default function DocumentExtractor({ presetId = null }) {
           const realCompletion = fileDoneResult.tokenUsage?.completionTokens || 0;
           const realTotal = fileDoneResult.tokenUsage?.totalTokens || 0;
 
-          // 纠偏 Token
+          // 纠偏并累加进完成用量
+          setHistoricalTokenUsage(prev => ({
+            promptTokens: prev.promptTokens + realPrompt,
+            completionTokens: prev.completionTokens + realCompletion,
+            totalTokens: prev.totalTokens + realTotal
+          }));
           setFileEstPromptTokensMap(prev => {
-            const currentEstPrompt = prev[file.md5] || estPromptTokens;
-            totalPromptTokens = totalPromptTokens - currentEstPrompt + realPrompt;
-            totalCompletionTokens = totalCompletionTokens - lastEstCompletion + realCompletion;
-            totalTotalTokens = totalTotalTokens - currentEstPrompt - lastEstCompletion + realTotal;
-
-            setTokenUsage({
-              promptTokens: totalPromptTokens,
-              completionTokens: totalCompletionTokens,
-              totalTokens: totalTotalTokens
-            });
             const updated = Object.assign({}, prev, { [file.md5]: realPrompt });
             return updated;
           });
@@ -1327,6 +1380,12 @@ export default function DocumentExtractor({ presetId = null }) {
           return updated;
         });
         break;
+      } finally {
+        setActiveFileTokenUsage(prev => {
+          const updated = { ...prev };
+          delete updated[file.md5];
+          return updated;
+        });
       }
     }
 
@@ -1409,16 +1468,10 @@ export default function DocumentExtractor({ presetId = null }) {
       const updated = Object.assign({}, prev, { [file.md5]: estPromptTokens });
       return updated;
     });
-    setTokenUsage(prev => {
-      const oldPrompt = prev?.promptTokens || 0;
-      const oldCompletion = prev?.completionTokens || 0;
-      const oldTotal = prev?.totalTokens || 0;
-      return {
-        promptTokens: oldPrompt + estPromptTokens,
-        completionTokens: oldCompletion,
-        totalTokens: oldTotal + estPromptTokens
-      };
-    });
+    setActiveFileTokenUsage(prev => ({
+      ...prev,
+      [file.md5]: { promptTokens: estPromptTokens, completionTokens: 0 }
+    }));
 
     try {
       const res = await fetch('/api/extract', {
@@ -1478,34 +1531,31 @@ export default function DocumentExtractor({ presetId = null }) {
 
               // 输出 Token随字数增长动态计算逻辑
               const estCompletion = Math.round(fileRawContent.length * 1.3);
-              const diffCompletion = estCompletion - lastEstCompletion;
-              lastEstCompletion = estCompletion;
-
-              setTokenUsage(prev => {
-                const oldPrompt = prev?.promptTokens || 0;
-                const oldCompletion = prev?.completionTokens || 0;
-                const oldTotal = prev?.totalTokens || 0;
+              setActiveFileTokenUsage(prev => {
+                const existing = prev[file.md5] || { promptTokens: 0, completionTokens: 0 };
                 return {
-                  promptTokens: oldPrompt,
-                  completionTokens: oldCompletion + diffCompletion,
-                  totalTokens: oldTotal + diffCompletion
+                  ...prev,
+                  [file.md5]: {
+                    ...existing,
+                    completionTokens: estCompletion
+                  }
                 };
               });
 
             } else if (line.type === 'estimated') {
               // 精准估算输入 Token 并实时覆盖更新
               const realEst = line.promptTokens || 0;
+              setActiveFileTokenUsage(prev => {
+                const existing = prev[file.md5] || { promptTokens: 0, completionTokens: 0 };
+                return {
+                  ...prev,
+                  [file.md5]: {
+                    ...existing,
+                    promptTokens: realEst
+                  }
+                };
+              });
               setFileEstPromptTokensMap(prev => {
-                const oldEstForThisFile = prev[file.md5] || estPromptTokens;
-                setTokenUsage(tu => {
-                  const oldPrompt = tu?.promptTokens || 0;
-                  const oldCompletion = tu?.completionTokens || 0;
-                  return {
-                    promptTokens: oldPrompt - oldEstForThisFile + realEst,
-                    completionTokens: oldCompletion,
-                    totalTokens: oldPrompt - oldEstForThisFile + realEst + oldCompletion
-                  };
-                });
                 const updated = Object.assign({}, prev, { [file.md5]: realEst });
                 return updated;
               });
@@ -1526,16 +1576,12 @@ export default function DocumentExtractor({ presetId = null }) {
         const realCompletion = fileDoneResult.tokenUsage?.completionTokens || 0;
         const realTotal = fileDoneResult.tokenUsage?.totalTokens || 0;
 
-        // 纠偏 Token
-        setTokenUsage(prev => {
-          const oldPrompt = prev?.promptTokens || 0;
-          const oldCompletion = prev?.completionTokens || 0;
-          return {
-            promptTokens: oldPrompt - estPromptTokens + realPrompt,
-            completionTokens: oldCompletion - lastEstCompletion + realCompletion,
-            totalTokens: oldPrompt - estPromptTokens + realPrompt + oldCompletion - lastEstCompletion + realCompletion
-          };
-        });
+        // 纠偏并累加进完成用量
+        setHistoricalTokenUsage(prev => ({
+          promptTokens: prev.promptTokens + realPrompt,
+          completionTokens: prev.completionTokens + realCompletion,
+          totalTokens: prev.totalTokens + realTotal
+        }));
 
         const rawItems = fileDoneResult.data || [];
         const filtered = rawItems.filter(item => {
@@ -1577,6 +1623,11 @@ export default function DocumentExtractor({ presetId = null }) {
           percent: 100,
           currentFile: '所有文档处理完毕'
         };
+      });
+      setActiveFileTokenUsage(prev => {
+        const updated = { ...prev };
+        delete updated[file.md5];
+        return updated;
       });
     }
   };
@@ -1860,7 +1911,7 @@ export default function DocumentExtractor({ presetId = null }) {
                       const isSelected = (!preset && item.id === 'default') || (preset?.id === item.id);
                       const targetHref = item.id === 'default' ? '/' : `/preset/${item.id}`;
                       const displayIcon = item.icon || (item.id === 'default' ? '🌐' : '⚙️');
-                      const titleText = item.department ? `${item.department}` : (item.name || item.id);
+                      const titleText = item.name || item.id;
 
                       return (
                         <React.Fragment key={item.id}>
@@ -1873,7 +1924,25 @@ export default function DocumentExtractor({ presetId = null }) {
                               }`}
                           >
                             <div className="flex items-center gap-2">
-                              <span className="text-sm">{displayIcon}</span>
+                              <span className="flex items-center justify-center text-sm w-4 h-4">
+                                {typeof displayIcon === 'string' && displayIcon.endsWith('.svg') ? (
+                                  <span
+                                    className={`inline-block w-3.5 h-3.5 ${isSelected ? 'bg-near-black' : 'bg-terracotta'}`}
+                                    style={{
+                                      maskImage: `url(${displayIcon})`,
+                                      WebkitMaskImage: `url(${displayIcon})`,
+                                      maskSize: 'contain',
+                                      WebkitMaskSize: 'contain',
+                                      maskPosition: 'center',
+                                      WebkitMaskPosition: 'center',
+                                      maskRepeat: 'no-repeat',
+                                      WebkitMaskRepeat: 'no-repeat'
+                                    }}
+                                  />
+                                ) : (
+                                  displayIcon
+                                )}
+                              </span>
                               <div className="flex flex-col">
                                 <span>{titleText}</span>
                                 <span className="text-[10px] text-stone-gray font-normal">{item.subtitle || '预设数据提取配置'}</span>
@@ -1920,7 +1989,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
                     {!canCustomPlatform && (
                       <div className="p-2.5 mb-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs flex items-center gap-1.5 font-medium">
-                        🔒 配置已由【{preset?.department || '部门预设'}】统一预设。
+                        🔒 配置已由【{preset?.name || '通用预设'}】统一预设。
                       </div>
                     )}
 
@@ -2136,7 +2205,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
                     {!canCustomModel && (
                       <div className="p-2.5 mb-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs flex items-center gap-1.5 font-medium">
-                        🔒 配置已由【{preset?.department || '部门预设'}】统一预设。
+                        🔒 配置已由【{preset?.name || '通用预设'}】统一预设。
                       </div>
                     )}
 
@@ -2537,7 +2606,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
                     {!canCustomFields && (
                       <div className="mb-4 p-2.5 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs flex items-center gap-1.5 font-semibold">
-                        🔒 解析字段配置已使用【{preset?.department || '部门预设'}】标准化预设。
+                        🔒 解析字段配置已使用【{preset?.name || '通用预设'}】标准化预设。
                       </div>
                     )}
 
@@ -2695,7 +2764,7 @@ export default function DocumentExtractor({ presetId = null }) {
                         </div>
                       ) : (
                         <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full">
-                          🔒 提示词已使用【{preset?.department || '部门预设'}】标准化预设
+                          🔒 提示词已使用【{preset?.name || '通用预设'}】标准化预设
                         </span>
                       )}
                     </div>
@@ -2731,8 +2800,8 @@ export default function DocumentExtractor({ presetId = null }) {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
                 {/* Left column: Data preview (2/3 width) */}
-                <div className="lg:col-span-2">
-                  <section className="bg-ivory border border-border-cream rounded-xl p-8 shadow-sm">
+                <div className="lg:col-span-2 min-w-0 w-full">
+                  <section className="bg-ivory border border-border-cream rounded-xl p-8 shadow-sm w-full min-w-0 overflow-hidden">
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center gap-3">
                         <Sparkles className="w-5 h-5 text-terracotta" />
@@ -2755,14 +2824,17 @@ export default function DocumentExtractor({ presetId = null }) {
                         <span className="text-xs font-semibold">请完成步骤 3 的提取后再在此处查看</span>
                       </div>
                     ) : (
-                      <div className="border border-border-cream rounded-lg overflow-hidden bg-white max-h-[500px] overflow-auto">
-                        <table className="w-full border-collapse text-left text-xs table-fixed min-w-[800px]">
+                      <div className="border border-border-cream rounded-lg bg-white max-h-[500px] overflow-x-auto overflow-y-auto custom-scrollbar w-full">
+                        <table
+                          className="w-full border-collapse text-left text-xs table-fixed"
+                          style={{ minWidth: `${step4TotalWidth}px` }}
+                        >
                           <thead>
                             <tr className="bg-parchment border-b border-border-cream">
                               <th className="p-3 font-bold text-near-black w-[50px] text-center sticky top-0 bg-parchment border-r border-border-cream">#</th>
                               <th className="p-3 font-bold text-near-black w-[120px] text-left sticky top-0 bg-parchment border-r-2 border-r-stone-200">信息来源</th>
                               {fields.map((f, idx) => (
-                                <th key={idx} className="p-3 font-bold text-near-black truncate sticky top-0 bg-parchment" title={f.label}>
+                                <th key={idx} style={{ width: `${step4FieldWidths[idx]}px` }} className="p-3 font-bold text-near-black truncate sticky top-0 bg-parchment" title={f.label}>
                                   {f.label}
                                 </th>
                               ))}
@@ -2773,7 +2845,7 @@ export default function DocumentExtractor({ presetId = null }) {
                               <tr key={rowIndex} className="hover:bg-ivory/30 transition">
                                 <td className="p-3 font-bold text-stone-gray text-center sticky left-0 z-10 bg-white border-r border-border-cream w-[50px]">{rowIndex + 1}</td>
                                 <td className="p-2 align-top sticky left-[50px] z-10 bg-stone-50/90 border-r-2 border-r-stone-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] border-l-3 border-l-terracotta/40 w-[120px]">
-                                  <div className="flex flex-col gap-1 text-[10px] leading-tight w-full">
+                                  <div className="flex flex-col items-center justify-center gap-1 text-[10px] leading-tight w-full text-center">
                                     {(() => {
                                       const fileObj = filesQueue.find(f => f.md5 === issue._fileMd5);
                                       const fileName = fileObj ? fileObj.fileName : '手动添加';
@@ -2814,7 +2886,7 @@ export default function DocumentExtractor({ presetId = null }) {
                                       const rawPage = issue._page;
                                       const displayPage = rawPage ? ("第" + rawPage + "页") : '第1页';
                                       return (
-                                        <span className="bg-orange-50 text-orange-700 border border-orange-200/60 px-6 py-0.5 rounded font-bold w-max text-[12px] inline-block mt-0.5 shadow-2xs">
+                                        <span className="bg-orange-50 text-orange-700 border border-orange-200/60 px-2 py-0.5 rounded font-bold w-max text-[10px] inline-block mt-0.5 shadow-2xs">
                                           {displayPage}
                                         </span>
                                       );
@@ -3175,21 +3247,21 @@ export default function DocumentExtractor({ presetId = null }) {
                     </div>
 
                     {/* Results grid */}
-                    <div className="border border-border-cream rounded-lg bg-white shadow-sm max-h-[650px] overflow-auto">
-                      <table className="min-w-[1300px] w-full border-collapse text-left text-xs table-fixed">
+                    <div className="border border-border-cream rounded-lg bg-white shadow-sm max-h-[650px] overflow-auto custom-scrollbar">
+                      <table
+                        className="w-full border-collapse text-left text-xs table-fixed"
+                        style={{ minWidth: `${step3TotalWidth}px` }}
+                      >
                         <thead className="bg-parchment border-b border-border-cream shadow-[0_1px_0_0_#e8e6dc] [&_th:first-child]:rounded-tl-lg [&_th:last-child]:rounded-tr-lg">
                           <tr>
                             <th className="p-3 font-bold text-near-black w-[50px] text-center whitespace-nowrap sticky left-0 top-0 z-40 bg-parchment border-r border-border-cream shadow-[0_1px_0_0_#e8e6dc]">#</th>
                             <th className="p-3 font-bold text-near-black w-[100px] text-left whitespace-nowrap sticky left-[50px] top-0 z-40 bg-parchment border-r-2 border-r-stone-200 shadow-[2px_1px_0_0_#e8e6dc] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">信息来源</th>
-                            {fields.map((f, idx) => {
-                              const dataColWidth = fields.length > 0 ? `${(85 / fields.length).toFixed(2)}%` : '85%';
-                              return (
-                                <th key={idx} style={{ width: dataColWidth }} className="p-3 font-bold text-near-black truncate sticky top-0 z-30 bg-parchment" title={f.label}>
-                                  {f.label || `列_${idx + 1}`}
-                                </th>
-                              );
-                            })}
-                            <th className="p-3 font-bold text-near-black text-center w-[6%] whitespace-nowrap sticky top-0 z-30 bg-parchment">操作</th>
+                            {fields.map((f, idx) => (
+                              <th key={idx} style={{ width: `${step3FieldWidths[idx]}px` }} className="p-3 font-bold text-near-black truncate sticky top-0 z-30 bg-parchment" title={f.label}>
+                                {f.label || `列_${idx + 1}`}
+                              </th>
+                            ))}
+                            <th className="p-3 font-bold text-near-black text-center whitespace-nowrap sticky right-0 top-0 z-40 bg-parchment border-l border-border-cream shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] w-[80px]">操作</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border-cream">
@@ -3199,7 +3271,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
                               {/* 只读冻结列：数据源与页码 */}
                               <td className="p-2 align-top sticky left-[50px] z-10 bg-stone-50/90 border-r-2 border-r-stone-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] border-l-3 border-l-terracotta/40 w-[100px]">
-                                <div className="flex flex-col gap-1 text-[10px] leading-tight w-full">
+                                <div className="flex flex-col items-center justify-center gap-1 text-[10px] leading-tight w-full text-center">
                                   {(() => {
                                     const fileObj = filesQueue.find(f => f.md5 === issue._fileMd5);
                                     const fileName = fileObj ? fileObj.fileName : '手动添加';
@@ -3242,7 +3314,7 @@ export default function DocumentExtractor({ presetId = null }) {
                                     const rawPage = issue._page;
                                     const displayPage = rawPage ? ("第" + rawPage + "页") : '第1页';
                                     return (
-                                      <span className="bg-orange-50 text-orange-700 border border-orange-200/60 px-6 py-0.5 rounded font-bold w-max text-[12px] inline-block mt-0.5 shadow-2xs">
+                                      <span className="bg-orange-50 text-orange-700 border border-orange-200/60 px-2 py-0.5 rounded font-bold w-max text-[10px] inline-block mt-0.5 shadow-2xs">
                                         {displayPage}
                                       </span>
                                     );
@@ -3275,13 +3347,26 @@ export default function DocumentExtractor({ presetId = null }) {
                                 );
                               })}
 
-                              <td className="p-2 text-center align-top">
-                                <button
-                                  onClick={() => removeIssueRow(rowIndex)}
-                                  className="text-stone-gray hover:text-error-crimson p-1.5 rounded transition mt-0.5"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
+                              <td className="p-2 text-center align-top sticky right-0 z-10 bg-white border-l border-border-cream shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] w-[80px]">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    onClick={() => {
+                                      setActiveReviewIndex(rowIndex);
+                                      setDetailFormState(extractedIssues[rowIndex] || {});
+                                    }}
+                                    className="text-olive-gray hover:text-terracotta p-1 rounded transition"
+                                    title="校验详情"
+                                  >
+                                    <Eye size={13} />
+                                  </button>
+                                  <button
+                                    onClick={() => removeIssueRow(rowIndex)}
+                                    className="text-stone-gray hover:text-error-crimson p-1 rounded transition"
+                                    title="删除记录"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -3526,6 +3611,127 @@ export default function DocumentExtractor({ presetId = null }) {
                   className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-4 py-2 rounded transition"
                 >
                   关闭
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Detailed Record Review & Edit Modal ── */}
+      <AnimatePresence>
+        {activeReviewIndex !== null && extractedIssues[activeReviewIndex] && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-ivory border border-warm-sand w-full max-w-4xl rounded-xl p-6 shadow-2xl text-near-black flex flex-col max-h-[85vh]"
+            >
+              <div className="flex items-center justify-between border-b border-border-cream pb-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">📋</span>
+                  <h3 className="font-serif font-bold text-base">
+                    数据记录校验详情 (第 {activeReviewIndex + 1} / {extractedIssues.length} 条)
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setActiveReviewIndex(null)}
+                  className="text-stone-gray hover:text-near-black p-1 hover:bg-warm-sand/50 rounded transition"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Document Source Banner */}
+              {(() => {
+                const issue = extractedIssues[activeReviewIndex];
+                const fileObj = filesQueue.find(f => f.md5 === issue._fileMd5);
+                const fileName = fileObj ? fileObj.fileName : '手动添加';
+                const rawPage = issue._page;
+                const displayPage = rawPage ? `第 ${rawPage} 页` : '第 1 页';
+                return (
+                  <div className="bg-warm-sand/35 border border-border-cream/80 rounded-lg px-4 py-2 text-xs font-semibold text-olive-gray mb-4 flex items-center justify-between">
+                    <span className="truncate max-w-md">📄 数据来源: {fileName}</span>
+                    <span className="bg-orange-50 text-orange-700 border border-orange-200/50 px-2 py-0.5 rounded text-[11px] font-bold">
+                      {displayPage}
+                    </span>
+                  </div>
+                );
+              })()}
+
+              {/* Form Fields Grid */}
+              <div className="flex-1 overflow-auto grid grid-cols-1 md:grid-cols-2 gap-4 pr-1 custom-scrollbar">
+                {fields.map((f, idx) => {
+                  const key = f.key || `field_${idx + 1}`;
+                  const errKey = `${activeReviewIndex}_${key}`;
+                  const isInvalid = !!validationErrors[errKey];
+                  return (
+                    <div key={idx} className="flex flex-col gap-1 bg-white border border-border-cream/40 p-3 rounded-lg shadow-2xs">
+                      <div className="flex items-center justify-between text-xs font-bold text-near-black mb-1">
+                        <span>{f.label || `列_${idx + 1}`}</span>
+                        <span className="text-[10px] text-stone-gray font-normal px-1.5 py-0.5 rounded bg-warm-sand/30 font-mono">
+                          {key}
+                        </span>
+                      </div>
+                      <textarea
+                        className={`w-full text-xs border rounded-lg p-2.5 outline-none transition focus:bg-ivory/30 focus:border-terracotta focus:ring-1 focus:ring-terracotta resize-y min-h-[50px] ${isInvalid ? 'border-red-400 bg-red-50/50' : 'border-border-cream bg-stone-50/30'
+                          }`}
+                        rows={2}
+                        value={detailFormState[key] || ''}
+                        onChange={(e) => handleDetailFieldChange(key, e.target.value)}
+                        placeholder={f.example ? `如: ${f.example}` : '暂无数据'}
+                      />
+                      {isInvalid && (
+                        <span className="text-[10px] text-error-crimson font-medium mt-1">
+                          ⚠️ {validationErrors[errKey]}
+                        </span>
+                      )}
+                      {f.desc && (
+                        <span className="text-[10px] text-stone-gray leading-tight mt-1">
+                          💡 属性描述: {f.desc}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Footer navigation & Action */}
+              <div className="flex justify-between items-center mt-5 border-t border-border-cream pt-4">
+                <div className="flex gap-2">
+                  <button
+                    disabled={activeReviewIndex === 0}
+                    onClick={() => {
+                      const nextIdx = activeReviewIndex - 1;
+                      setActiveReviewIndex(nextIdx);
+                      setDetailFormState(extractedIssues[nextIdx] || {});
+                    }}
+                    className="border border-stone-gray hover:border-near-black disabled:opacity-40 disabled:hover:border-stone-gray text-olive-gray hover:text-near-black px-4 py-2 rounded text-xs font-semibold transition bg-white flex items-center gap-1"
+                  >
+                    <ArrowLeft size={14} />
+                    <span>上一条</span>
+                  </button>
+                  <button
+                    disabled={activeReviewIndex === extractedIssues.length - 1}
+                    onClick={() => {
+                      const nextIdx = activeReviewIndex + 1;
+                      setActiveReviewIndex(nextIdx);
+                      setDetailFormState(extractedIssues[nextIdx] || {});
+                    }}
+                    className="border border-stone-gray hover:border-near-black disabled:opacity-40 disabled:hover:border-stone-gray text-olive-gray hover:text-near-black px-4 py-2 rounded text-xs font-semibold transition bg-white flex items-center gap-1"
+                  >
+                    <span>下一条</span>
+                    <motion.div animate={{ x: [0, 2, 0] }} transition={{ repeat: Infinity, duration: 1.5 }}>
+                      <ArrowRight size={14} />
+                    </motion.div>
+                  </button>
+                </div>
+                <button
+                  onClick={() => setActiveReviewIndex(null)}
+                  className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-5 py-2 rounded-lg transition"
+                >
+                  关闭详情
                 </button>
               </div>
             </motion.div>
