@@ -76,12 +76,11 @@ pnpm install
 在项目根目录创建并配置 `.env` 文件（可参考现有的 `.env`）：
 
 ```ini
-LLM_PROVIDER=kimi
 
 # 默认 LLM 凭证（后端安全读取）
-OPENAI_API_KEY=您的默认APIKEY
-OPENAI_BASE_URL=https://api.moonshot.cn/v1
-OPENAI_MODEL=kimi-k2.7-code
+# ── 大模型 API 敏感密钥 ──
+OPENAI_API_KEY=your_openai_api_key_here
+KIMI_API_KEY=your_kimi_api_key_here
 
 # 默认飞书测试凭证
 LARK_APP_ID=您的LARK_APP_ID
@@ -91,6 +90,11 @@ LARK_APP_SECRET=您的LARK_APP_SECRET
 WPS_APP_ID=您的WPS_APP_ID
 WPS_APP_SECRET=您的WPS_APP_SECRET
 ```
+> **💡 如何在配置中引用这些密钥？**
+> 系统采用基于 `config.json` 的解耦式凭证读取。在您的 `config.json` 里，所有敏感凭证并不是直接写死，而是填写 `.env` 中声明的**键名**：
+> - **大模型 (`llm.configs`)**: 指定 `"apiKey": "KIMI_API_KEY"`。
+> - **多维表 (`tables.configs`)**: 指定 `"appIdEnv": "WPS_APP_ID"` 和 `"appSecretEnv": "WPS_APP_SECRET"`。
+> 这样在服务器运转时，框架会自动安全地从对应环境变量中抽取出真实秘钥，保证 `config.json` 可以安全地被加入 Git 版本控制。
 
 ### 3. 本地启动开发服务器（支持热重载）
 
@@ -106,6 +110,28 @@ pnpm dev
 pnpm build
 pnpm start
 ```
+
+---
+
+## ⚙️ 核心配置文件指南
+
+DocEx 采用轻量化、静态 JSON 驱动的设计理念，大部分核心环境均可通过修改根目录的配置中心实时生效：
+
+### 1. `config.json` (系统与生态网关配置)
+本文件负责全局运行参数、LLM（大语言模型）资源池、以及多维表格终端的定义：
+* **`llm.configs`**: 配置默认模型与高速模型节点（支持 Kimi、OpenAI 兼容接口等）。API Key 推荐从 `.env` 中读取（如 `"apiKey": "KIMI_API_KEY"`）。
+* **`tables.configs`**: 定义目标多维表格（支持 WPS 和飞书）。支持按项目环境维护多张表格的 ID 和环境变量鉴权（如 `WPS_APP_ID`）。
+* **`rateLimit`** / **`paths`**: 配置防刷限流阈值与各物理输出的目录存放位置。
+
+### 2. `fields.json` (基础提取字段库)
+系统内置的各种“表单抽屉”的提取蓝本库。
+* 它是一个 Array，每个对象定义了一套完整的特定场景提取规则（例如 `invoice` 负责发票，`hse` 负责安全问题）。
+* 在前端的“一键引入内置字段”面板中展现给用户。您可以根据公司自身需求增删 `key`、`label`、`example` 从而为模型划定识别红线。
+
+### 3. `presets/` 目录 (融合性预设模板)
+当您需要为特定的业务系统打造“一键开箱即用”的功能时，这里是终极配置。
+* **组合能力**：一个 preset JSON 会在内部组合特定的大模型 (`llmConfig`)、特定的表格 (`tableConfig`) 以及提取的特定字段集合 (`fields`)。
+* **业务沉淀**：例如您可以创建一个 `presets/report.json`。用户在浏览器点击该预设链接后，将自动应用最高级大模型，自动套用项目所需的 20 个复杂字段，提取成功后点击推送也会直接落到对应的特定知识库表中。
 
 ---
 

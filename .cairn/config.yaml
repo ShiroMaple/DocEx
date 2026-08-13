@@ -1,7 +1,7 @@
 version: 0.1
 project:
   name: "DocEx"
-  summary: "智能结构化文档数据提取"
+  summary: "智能结构化提取文档信息"
 cairn:
   knowledge_dir: "cairn"
   skill_spec_date: "2026-08-07"
