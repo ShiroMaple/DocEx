@@ -1,6 +1,8 @@
-# DocEx (Document Extractor) - 智能文档数据结构化提取系统
+# DocEx (Document Extractor) - 智能结构化提取文档信息
 
-DocEx 是一款基于 **Next.js Fullstack (App Router)**、**Tailwind CSS**、**Framer Motion** 以及 **大语言模型 (Structured Outputs / Vision)** 开发的智能文档数据提取与校验系统。系统能够自动识别、解析多页 PDF 及 Word (.docx) 报告，支持图文交织多模态理解，并支持将对齐数据一键推送至 WPS 多维表及飞书多维表格。
+DocEx 是一款基于 **大语言模型(Structured Outputs / Vision)** 开发的智能文档数据提取与校验系统。
+
+能够自动识别、解析多页 PDF 、 Word (.docx) 以及图片，支持图文交织多模态理解，并支持将数据推送至云端多维表格。
 
 ---
 
@@ -8,8 +10,8 @@ DocEx 是一款基于 **Next.js Fullstack (App Router)**、**Tailwind CSS**、**
 
 ### 1. 📂 多模态预处理网关
 
-* **PDF 图像化切片**：自动提取电子 PDF 文字层，并同步将每一页报告高保真渲染为 PNG 截图，支持 Vision 多模态视觉理解。
-* **Word (docx) 交织还原**：解析 Word 内部结构，提取文本的同时将内嵌图片提取为 Base64 二进制流，完美还原图文并茂的版面结构。
+* **PDF 图像化切片**：自动提取 PDF 文字层，并同步将每一页渲染为 PNG 截图，支持 Vision 多模态视觉理解。
+* **Word 交织还原**：解析 Word 内部结构，提取文本的同时将内嵌图片提取为 Base64 二进制流，还原图文并茂的版面。
 
 ### 2. 🧙 三步向导式核对表工作流
 
@@ -17,19 +19,17 @@ DocEx 是一款基于 **Next.js Fullstack (App Router)**、**Tailwind CSS**、**
   * 支持拖拽及多文件批量上传，支持实时流式解析进度条。
   * 提供**文档单独重试按钮**，重试时可一键移除相关记录、重新解析并重新计算 Token。
 * **步骤 2：字段定义与 AI 微调**：
-  * **动态字段矩阵**：支持自由增删改提取的目标字段（项目名、类别、描述等）以及其映射键名（Docex Key）。
+  * **动态字段矩阵**：支持自由增删改提取的目标字段（项目名、类别、描述等）并支持“AI自动识别待提取字段”。
   * **提示词微调设置**：内置行业专家提示词，支持一键“AI 优化”，并配有“恢复默认”一键重置功能。
-* **步骤 3：数据对齐、核对与推送**：
-  * 优雅扁平的“核对表”容器，粘性吸顶表头防止错位，支持一次性容纳大量记录，并实时显示统计。
+* **步骤 3：数据核对与推送**：
   * 支持就地双击编辑、手动添加空白行、以及删除不合规记录。
   * **多维对齐**：支持一键“已核对识别结果，推送至多维表格”。
   * **本地备份**：提供“导出为 Excel (xlsx)”一键下载功能。
 
 ### 3. 🛡️ 智能大模型网关 (Multi-Config & Rate Limit)
 
-* **多配置管理**：支持“默认配置（只读，服务商 XiaoMi）”与“自定义配置模板”的动态切换、命名保存及删除。
-* **安全混淆**：敏感的 API Key 仅存在于用户浏览器 `localStorage` 中，后端内存即时消费，零服务器痕迹。
-* **共享防护 (Rate Limiting)**：针对公共默认 AI 密钥，限制**每个 IP 地址每分钟最多请求 5 次**，超出则拦截并返回 `429` 状态码，防恶意滥用。
+* **多配置管理**：支持“默认配置（只读）”与“自定义配置模板”的动态切换、命名保存及删除。
+* **共享防护 (Rate Limiting)**：针对公共默认 AI 密钥，限制**每个 IP 地址每分钟最多请求 20 次**，超出则拦截并返回 `429` 状态码，防恶意滥用。
 
 ### 4. 📊 多平台云端多维表格网关
 
@@ -65,7 +65,7 @@ DocEx 是一款基于 **Next.js Fullstack (App Router)**、**Tailwind CSS**、**
 
 ### 1. 依赖安装
 
-确保本地安装有 Node.js (推荐 v18+ LTS) 与 `pnpm` 包管理工具：
+确保本地安装有 Node.js (推荐 v20+ LTS) 与 `pnpm` 包管理工具：
 
 ```bash
 pnpm install
@@ -76,12 +76,12 @@ pnpm install
 在项目根目录创建并配置 `.env` 文件（可参考现有的 `.env`）：
 
 ```ini
-LLM_PROVIDER=xiaomi
+LLM_PROVIDER=kimi
 
 # 默认 LLM 凭证（后端安全读取）
 OPENAI_API_KEY=您的默认APIKEY
-OPENAI_BASE_URL=https://token-plan-cn.xiaomimimo.com/v1
-OPENAI_MODEL=mimo-v2.5
+OPENAI_BASE_URL=https://api.moonshot.cn/v1
+OPENAI_MODEL=kimi-k2.7-code
 
 # 默认飞书测试凭证
 LARK_APP_ID=您的LARK_APP_ID

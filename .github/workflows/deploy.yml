@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main # 当 main 分支有代码推送时触发
+    # 忽略以下路径的变更（修改这些文件时不会触发流水线）
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '.gitignore'    
 
 jobs:
   build-and-deploy:
