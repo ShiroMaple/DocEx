@@ -171,6 +171,8 @@ export function readConfigFromDisk() {
     tableId: parsedEnv.WPS_TABLE_ID || process.env.WPS_TABLE_ID || ''
   };
 
+  const llmPricing = rawConfigJson.llm?.pricing || {};
+
   return {
     system,
     rateLimit,
@@ -181,7 +183,8 @@ export function readConfigFromDisk() {
     defaultLLMList,
     parsedTableConfigs,
     lark,
-    wps
+    wps,
+    llmPricing
   };
 }
 
@@ -198,6 +201,7 @@ export const config = {
   get defaultFeishuConf() { return readConfigFromDisk().defaultFeishuConf; },
   get defaultLLMList() { return readConfigFromDisk().defaultLLMList; },
   get parsedTableConfigs() { return readConfigFromDisk().parsedTableConfigs; },
+  get llmPricing() { return readConfigFromDisk().llmPricing; },
   
   // 补齐 Getter 代理，防 presets 读取挂死
   get lark() { return readConfigFromDisk().lark; },

@@ -24,8 +24,12 @@ import { withLogging, logger } from '../../../lib/logger.js';
  * 动态在多维表格中新建一列
  */
 async function createFieldHandler(request) {
+  let provider, fieldName;
   try {
-    const { provider, fileId, appToken, tableId, fieldName } = await request.json();
+    const body = await request.json();
+    provider = body.provider;
+    fieldName = body.fieldName;
+    const { fileId, appToken, tableId } = body;
 
     if (!fieldName) {
       return NextResponse.json({ error: '列名 (fieldName) 不能为空' }, { status: 400 });

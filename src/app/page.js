@@ -33,6 +33,8 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
+  ChevronsDown,
+  ChevronsUp,
   Loader2,
   FileText,
   FileCheck,
@@ -40,7 +42,10 @@ import {
   ArrowRight,
   ArrowLeft,
   Download,
-  Eye
+  Eye,
+  RotateCcw,
+  Copy,
+  FileSpreadsheet
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -241,6 +246,33 @@ export default function DocumentExtractor({ presetId = null }) {
   const step3TotalWidth = 50 + 100 + step3FieldWidths.reduce((a, b) => a + b, 0) + 80;
   const [isPushing, setIsPushing] = useState(false);
   const [pushResult, setPushResult] = useState(null);
+  const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
+  const pushMenuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (pushMenuRef.current && !pushMenuRef.current.contains(event.target)) {
+        setIsPushMenuOpen(false);
+      }
+    };
+    if (isPushMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isPushMenuOpen]);
+
+  useEffect(() => {
+    if (filesQueue.length === 0) {
+      setPrepTokenUsage({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+      setHistoricalTokenUsage({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+      setActiveFileTokenUsage({});
+      setPushResult(null);
+      setExtractedIssues([]);
+    }
+  }, [filesQueue.length]);
+
   const [rawLlmResponse, setRawLlmResponse] = useState('');
   const [isLlmModalOpen, setIsLlmModalOpen] = useState(false);
   const [isDetectingFields, setIsDetectingFields] = useState(false);
@@ -764,7 +796,23 @@ export default function DocumentExtractor({ presetId = null }) {
     localStorage.setItem(`docex_mapping_${targetId}`, JSON.stringify(newMappings));
   };
 
-  const createTableColumn = async (columnName) => {
+  const createTableColumn = async (columnName, skipVerify = false) => {
+    // 幂等校验：若此列已存在则不重复创建，自动建立映射
+    const exists = schemaFields.some(sf => sf.name === columnName);
+    if (exists) {
+      const matchedField = fields.find(f => f.label === columnName);
+      if (matchedField) {
+        const currentKey = matchedField.key;
+        setFieldMappings(prev => {
+          const updated = { ...prev, [columnName]: currentKey };
+          const targetId = platform === 'wps' ? wpsFileId : `${feishuAppToken}_${feishuTableId}`;
+          localStorage.setItem(`docex_mapping_${targetId}`, JSON.stringify(updated));
+          return updated;
+        });
+      }
+      return;
+    }
+
     try {
       const res = await fetch('/api/create-field', {
         method: 'POST',
@@ -780,23 +828,26 @@ export default function DocumentExtractor({ presetId = null }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '云端建列失败');
 
-      showToast(`已在云端创建列 "${columnName}"，正在重刷表头结构...`);
-      await verifyTableConnection();
+      if (!skipVerify) {
+        showToast(`已在云端创建列 "${columnName}"，正在重刷表头结构...`);
+        await verifyTableConnection();
+      }
     } catch (e) {
       alert(`创建失败: ${e.message}`);
+      throw e;
     }
   };
 
   // ── Smart Redirection for Step 3 Push to Step 4 ──
   const handleStep3Push = async () => {
     if (isTableConnected) {
-      showToast('⚡ 多维表连接已就绪，正在直接推送数据，请稍候...');
+      showToast('多维表连接已就绪，正在直接推送数据，请稍候...');
       pushToSpreadsheet();
     } else {
-      showToast('🔮 正在检查多维表格连接状态...');
+      showToast('正在检查多维表格连接状态...');
       const autoOk = await verifyTableConnection();
       if (autoOk) {
-        showToast('⚡ 自动连通成功！正在推送数据，请稍候...');
+        showToast('自动连通成功！正在推送数据，请稍候...');
         pushToSpreadsheet();
       } else {
         showToast('⚠️ 未检测到多维表配置或已连通的表格，已为您自动切换到 [步骤四] 进行设置！');
@@ -1131,6 +1182,26 @@ export default function DocumentExtractor({ presetId = null }) {
     setFields(prev => [...prev, { key: '', label: '', desc: '', example: '', isAdvancedOpen: false }]);
   };
 
+  const moveFieldItem = (index, direction) => {
+    const newFields = [...fields];
+    if (direction === 'up' && index > 0) {
+      const temp = newFields[index];
+      newFields[index] = newFields[index - 1];
+      newFields[index - 1] = temp;
+    } else if (direction === 'down' && index < newFields.length - 1) {
+      const temp = newFields[index];
+      newFields[index] = newFields[index + 1];
+      newFields[index + 1] = temp;
+    } else if (direction === 'top' && index > 0) {
+      const [item] = newFields.splice(index, 1);
+      newFields.unshift(item);
+    } else if (direction === 'bottom' && index < newFields.length - 1) {
+      const [item] = newFields.splice(index, 1);
+      newFields.push(item);
+    }
+    setFields(newFields);
+  };
+
   // ── Step 3: LLM Extraction & Safety Guard ──
   const checkPromptSecurityLocal = (promptText) => {
     const patterns = [
@@ -1162,7 +1233,16 @@ export default function DocumentExtractor({ presetId = null }) {
     setFileFilteredCountMap({});
     setFileEstPromptTokensMap({});
     setElapsedTime(null);
-    setHistoricalTokenUsage({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+    // 将上一次执行（若有）的流式临时开销归档合并至历史累加值中，实现持续累加模式
+    const activePrompt = Object.values(activeFileTokenUsage).reduce((sum, item) => sum + (item.promptTokens || 0), 0);
+    const activeCompletion = Object.values(activeFileTokenUsage).reduce((sum, item) => sum + (item.completionTokens || 0), 0);
+    const activeTotal = Object.values(activeFileTokenUsage).reduce((sum, item) => sum + (item.totalTokens || 0), 0);
+
+    setHistoricalTokenUsage(prev => ({
+      promptTokens: prev.promptTokens + activePrompt,
+      completionTokens: prev.completionTokens + activeCompletion,
+      totalTokens: prev.totalTokens + activeTotal
+    }));
     setActiveFileTokenUsage({});
     setPushResult(null);
     setRawLlmResponse('');
@@ -1766,6 +1846,135 @@ export default function DocumentExtractor({ presetId = null }) {
     } finally {
       setIsPushing(false);
     }
+  };
+
+  const getTargetTableLink = () => {
+    if (pushResult?.link) return pushResult.link;
+    if (platform === 'wps') {
+      return wpsFileId ? `https://365.kdocs.cn/l/${wpsFileId}` : '';
+    } else {
+      return feishuUrl || '';
+    }
+  };
+
+  const renderPushActionGroup = (onPrimaryClick, primaryText, primaryDisabled) => {
+    const isSuccess = pushResult?.success === true;
+    const link = getTargetTableLink();
+
+    return (
+      <div className="relative inline-flex items-center" ref={pushMenuRef}>
+        {/* Left Side: Main button or link */}
+        {isSuccess ? (
+          <a
+            href={link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-green-700 hover:bg-green-800 text-white text-xs font-semibold pl-5 pr-4 py-2.5 rounded-l border-r border-green-600/50 transition flex items-center gap-1.5 shadow-md hover:scale-[1.01] duration-150 whitespace-nowrap"
+          >
+            <CheckCircle2 size={13} className="text-green-200" />
+            <span>🎉 推送成功！点击前往多维表格 </span>
+          </a>
+        ) : (
+          <button
+            onClick={onPrimaryClick}
+            disabled={primaryDisabled || isPushing}
+            className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold pl-5 pr-4 py-2.5 rounded-l border-r border-terracotta-hover/50 transition flex items-center gap-1.5 shadow-sm disabled:opacity-40 whitespace-nowrap"
+          >
+            {isPushing && <Loader2 size={12} className="animate-spin" />}
+            <span>{isPushing ? '正在推送数据...' : primaryText}</span>
+          </button>
+        )}
+
+        {/* Right Side: Caret Drop-up Trigger */}
+        <button
+          onClick={() => setIsPushMenuOpen(!isPushMenuOpen)}
+          disabled={isPushing}
+          className={`text-white text-xs font-semibold px-3 py-2.5 rounded-r transition flex items-center shadow-md hover:scale-[1.01] duration-150 disabled:opacity-40 ${isSuccess
+              ? 'bg-[#6fcf97] hover:bg-[#5bbd84]'
+              : 'bg-terracotta hover:bg-terracotta-hover'
+            }`}
+          title="展开操作菜单"
+        >
+          <ChevronUp size={14} className={`transition-transform duration-200 ${isPushMenuOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {/* Drop-up Popover Menu */}
+        <AnimatePresence>
+          {isPushMenuOpen && !isPushing && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="absolute bottom-full right-0 mb-2 w-48 bg-ivory border border-warm-sand rounded-xl shadow-[0_4px_24px_rgba(20,20,19,0.08)] py-1.5 z-50 text-near-black flex flex-col"
+            >
+              {/* Item 1: 重新推送数据 (Only visible after a successful push) */}
+              {isSuccess && (
+                <button
+                  onClick={() => {
+                    setIsPushMenuOpen(false);
+                    if (activeStep === 3) {
+                      handleStep3Push();
+                    } else if (activeStep === 4) {
+                      pushToSpreadsheet();
+                    }
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-xs hover:bg-warm-sand/40 flex items-center gap-2.5 text-near-black font-medium transition-colors duration-150"
+                >
+                  <RotateCcw size={13} className="text-olive-gray" />
+                  <span>重新推送数据</span>
+                </button>
+              )}
+
+              {/* Item 2: 复制多维表格链接 (Visible always) */}
+              <button
+                onClick={() => {
+                  setIsPushMenuOpen(false);
+                  if (link) {
+                    navigator.clipboard.writeText(link);
+                    showToast('📋 已复制多维表格链接到剪贴板！');
+                  } else {
+                    showToast('⚠️ 暂无有效的多维表格链接，请先在步骤四配置。');
+                  }
+                }}
+                className={`w-full text-left px-4 py-2.5 text-xs hover:bg-warm-sand/40 flex items-center gap-2.5 text-near-black font-medium transition-colors duration-150 ${isSuccess ? 'border-t border-border-cream' : ''
+                  }`}
+              >
+                <Copy size={13} className="text-olive-gray" />
+                <span>复制多维表格链接</span>
+              </button>
+
+              {/* Item 3: 导出为 Excel */}
+              <button
+                onClick={() => {
+                  setIsPushMenuOpen(false);
+                  exportToExcel();
+                }}
+                className="w-full text-left px-4 py-2.5 text-xs hover:bg-warm-sand/40 flex items-center gap-2.5 text-near-black font-medium transition-colors duration-150 border-t border-border-cream"
+              >
+                <FileSpreadsheet size={13} className="text-olive-gray" />
+                <span>导出为 Excel </span>
+              </button>
+
+              {/* Item 4: 解析下一批文档 */}
+              <button
+                onClick={() => {
+                  setIsPushMenuOpen(false);
+                  if (window.confirm("将清空当前缓存，请确认已保存结果")) {
+                    setActiveStep(1);
+                    setFilesQueue([]);
+                  }
+                }}
+                className="w-full text-left px-4 py-2.5 text-xs hover:bg-terracotta/10 flex items-center gap-2.5 text-terracotta font-semibold transition-colors duration-150 border-t border-border-cream"
+              >
+                <Plus size={13} className="text-terracotta" />
+                <span>解析下一批文档</span>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
   };
 
   const formatSize = (bytes) => {
@@ -2619,9 +2828,9 @@ export default function DocumentExtractor({ presetId = null }) {
                         <thead>
                           <tr className="bg-parchment border-b border-border-cream">
                             <th className="p-4 font-bold text-near-black w-[22%] whitespace-nowrap">提取字段</th>
-                            <th className="p-4 font-bold text-near-black w-[40%] whitespace-nowrap">描述</th>
-                            <th className="p-4 font-bold text-near-black w-[32%] whitespace-nowrap">示例</th>
-                            <th className="p-4 font-bold text-near-black text-center w-[6%] whitespace-nowrap">操作</th>
+                            <th className="p-4 font-bold text-near-black w-[38%] whitespace-nowrap">描述</th>
+                            <th className="p-4 font-bold text-near-black w-[28%] whitespace-nowrap">示例</th>
+                            <th className="p-4 font-bold text-near-black text-center w-[12%] whitespace-nowrap">操作</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border-cream">
@@ -2668,19 +2877,62 @@ export default function DocumentExtractor({ presetId = null }) {
                                   />
                                 </td>
 
-
-
                                 <td className="p-4 align-top text-center">
-                                  {canCustomFields ? (
-                                    <button
-                                      onClick={() => removeFieldItem(index)}
-                                      className="p-1.5 text-stone-gray hover:text-error-crimson rounded transition"
-                                    >
-                                      <X size={14} />
-                                    </button>
-                                  ) : (
-                                    <span className="text-stone-gray text-[10px] flex justify-center pt-1" title="锁定不可删除">🔒</span>
-                                  )}
+                                  <div className="flex items-center justify-center gap-2 flex-nowrap w-full">
+                                    {/* 2x2 控制盘 */}
+                                    <div className="grid grid-cols-2 gap-0.5 bg-warm-sand/20 p-0.5 rounded border border-border-cream w-[46px] flex-shrink-0">
+                                      <button
+                                        onClick={() => moveFieldItem(index, 'top')}
+                                        disabled={index === 0}
+                                        className="w-5 h-5 flex items-center justify-center text-stone-gray hover:text-near-black hover:bg-warm-sand/50 disabled:opacity-10 disabled:pointer-events-none rounded transition p-0"
+                                        title="一键置顶"
+                                      >
+                                        <ChevronsUp size={11} />
+                                      </button>
+
+                                      <button
+                                        onClick={() => moveFieldItem(index, 'up')}
+                                        disabled={index === 0}
+                                        className="w-5 h-5 flex items-center justify-center text-stone-gray hover:text-near-black hover:bg-warm-sand/50 disabled:opacity-10 disabled:pointer-events-none rounded transition p-0"
+                                        title="上移"
+                                      >
+                                        <ChevronUp size={11} />
+                                      </button>
+
+                                      <button
+                                        onClick={() => moveFieldItem(index, 'bottom')}
+                                        disabled={index === fields.length - 1}
+                                        className="w-5 h-5 flex items-center justify-center text-stone-gray hover:text-near-black hover:bg-warm-sand/50 disabled:opacity-10 disabled:pointer-events-none rounded transition p-0"
+                                        title="一键置底"
+                                      >
+                                        <ChevronsDown size={11} />
+                                      </button>
+
+                                      <button
+                                        onClick={() => moveFieldItem(index, 'down')}
+                                        disabled={index === fields.length - 1}
+                                        className="w-5 h-5 flex items-center justify-center text-stone-gray hover:text-near-black hover:bg-warm-sand/50 disabled:opacity-10 disabled:pointer-events-none rounded transition p-0"
+                                        title="下移"
+                                      >
+                                        <ChevronDown size={11} />
+                                      </button>
+                                    </div>
+
+                                    {/* 删除/锁定 */}
+                                    <div className="w-6 flex items-center justify-center flex-shrink-0">
+                                      {canCustomFields ? (
+                                        <button
+                                          onClick={() => removeFieldItem(index)}
+                                          className="p-1 text-stone-gray hover:text-error-crimson hover:bg-warm-sand/40 rounded transition"
+                                          title="删除字段"
+                                        >
+                                          <X size={13} />
+                                        </button>
+                                      ) : (
+                                        <span className="text-stone-gray/50 text-[10px] select-none cursor-default" title="预设锁定，不可删除">🔒</span>
+                                      )}
+                                    </div>
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -2931,19 +3183,45 @@ export default function DocumentExtractor({ presetId = null }) {
                           <label className="text-xs font-bold text-olive-gray uppercase tracking-wider">推送字段映射</label>
                           {isTableConnected && (
                             <button
-                              onClick={() => {
-                                showToast('正在同步所有字段至多维表，请稍候...');
-                                Promise.all(fields.map(f => createTableColumn(f.label)))
-                                  .then(() => {
-                                    showToast('🎉 云端同步列头并映射成功！');
-                                  })
-                                  .catch(err => {
-                                    showToast(`❌ 同步失败: ${err.message}`, 'error');
+                              onClick={async () => {
+                                const missingFields = fields.filter(f => !schemaFields.some(sf => sf.name === f.label));
+                                if (missingFields.length === 0) {
+                                  let autoMappedCount = 0;
+                                  setFieldMappings(prev => {
+                                    const updated = { ...prev };
+                                    fields.forEach(f => {
+                                      const matchedColName = schemaFields.find(sf => sf.name === f.label)?.name;
+                                      if (matchedColName && !updated[matchedColName]) {
+                                        updated[matchedColName] = f.key;
+                                        autoMappedCount++;
+                                      }
+                                    });
+                                    if (autoMappedCount > 0) {
+                                      const targetId = platform === 'wps' ? wpsFileId : `${feishuAppToken}_${feishuTableId}`;
+                                      localStorage.setItem(`docex_mapping_${targetId}`, JSON.stringify(updated));
+                                    }
+                                    return updated;
                                   });
+                                  showToast(autoMappedCount > 0 ? `🎉 成功自动建立 ${autoMappedCount} 个已有列的映射！` : '🎉 所有字段已在多维表中存在并映射完毕！');
+                                  return;
+                                }
+
+                                showToast(`正在同步 ${missingFields.length} 个缺失列至多维表，请稍候...`);
+                                try {
+                                  for (const f of missingFields) {
+                                    await createTableColumn(f.label, true);
+                                  }
+                                  showToast('🎉 云端列头创建成功，正在刷新表头结构...');
+                                  await verifyTableConnection();
+                                  showToast('🎉 所有缺失列同步并映射成功！');
+                                } catch (err) {
+                                  showToast(`❌ 同步失败: ${err.message}`, 'error');
+                                  await verifyTableConnection();
+                                }
                               }}
                               className="text-[10px] font-bold text-terracotta hover:underline"
                             >
-                              [一键同步云端所有缺列]
+                              [一键同步字段至云端]
                             </button>
                           )}
                         </div>
@@ -3040,10 +3318,10 @@ export default function DocumentExtractor({ presetId = null }) {
                         )}
                         <span>
                           {isExtracting
-                            ? '正在进行 AI 解析提取：'
+                            ? ' AI 正在认真解析...'
                             : extractionError
                               ? '⚠️ AI 解析发生异常中断：'
-                              : '🎉 所有文档已成功解析提取！'}
+                              : '🎉 所有文档已成功解析！'}
                         </span>
                         <span className="text-near-black font-bold">
                           第 {extractingProgress.currentIndex} / {extractingProgress.totalFiles} 个文档
@@ -3225,6 +3503,15 @@ export default function DocumentExtractor({ presetId = null }) {
                           <span>添加空白行记录</span>
                         </button>
 
+                        {rawLlmResponse && (
+                          <button
+                            onClick={() => setIsLlmModalOpen(true)}
+                            className="border border-stone-gray hover:border-near-black text-olive-gray hover:text-near-black px-3.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition bg-white shadow-xs"
+                          >
+                            <span>🤖 查看 LLM 原始输出</span>
+                          </button>
+                        )}
+
                         {extractedIssues.length > 0 && (
                           <button
                             onClick={exportToExcel}
@@ -3232,15 +3519,6 @@ export default function DocumentExtractor({ presetId = null }) {
                           >
                             <Download size={12} />
                             <span>导出为 Excel</span>
-                          </button>
-                        )}
-
-                        {rawLlmResponse && (
-                          <button
-                            onClick={() => setIsLlmModalOpen(true)}
-                            className="border border-stone-gray hover:border-near-black text-olive-gray hover:text-near-black px-3.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition bg-white shadow-xs"
-                          >
-                            <span>🤖 查看 LLM 原始输出</span>
                           </button>
                         )}
                       </div>
@@ -3464,24 +3742,49 @@ export default function DocumentExtractor({ presetId = null }) {
             )}
 
             {activeStep === 2 && (
-              <button
-                onClick={startExtraction}
-                disabled={isExtracting || isDetectingFields || filesQueue.filter(f => f.status === 'done').length === 0}
-                className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-8 py-2.5 rounded transition flex items-center gap-1.5 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
-                title={isDetectingFields ? "请等待自动识别字段完成" : ""}
-              >
-                {isExtracting ? (
+              <>
+                {extractedIssues.length > 0 ? (
                   <>
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>解析中...</span>
+                    <button
+                      onClick={startExtraction}
+                      disabled={isExtracting || isDetectingFields || filesQueue.filter(f => f.status === 'done').length === 0}
+                      className="px-5 py-2.5 rounded text-xs font-semibold border border-terracotta/40 bg-terracotta/10 text-terracotta hover:bg-terracotta/20 transition flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed shadow-xs"
+                      title={isDetectingFields ? "请等待自动识别字段完成" : "以当前配置的字段重新发起文档分析提取"}
+                    >
+                      {isExtracting && <Loader2 size={12} className="animate-spin" />}
+                      <span>重新解析</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveStep(3)}
+                      disabled={isExtracting || isDetectingFields}
+                      className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-8 py-2.5 rounded transition flex items-center gap-1.5 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <span>查看已解析的结果</span>
+                      <ArrowRight size={14} />
+                    </button>
                   </>
                 ) : (
-                  <>
-                    <span>下一步：开始解析</span>
-                    <ArrowRight size={14} />
-                  </>
+                  <button
+                    onClick={startExtraction}
+                    disabled={isExtracting || isDetectingFields || filesQueue.filter(f => f.status === 'done').length === 0}
+                    className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-8 py-2.5 rounded transition flex items-center gap-1.5 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                    title={isDetectingFields ? "请等待自动识别字段完成" : ""}
+                  >
+                    {isExtracting ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>解析中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>下一步：开始解析</span>
+                        <ArrowRight size={14} />
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
+              </>
             )}
 
             {activeStep === 3 && extractedIssues.length > 0 && (
@@ -3490,30 +3793,11 @@ export default function DocumentExtractor({ presetId = null }) {
                   onClick={() => setActiveStep(4)}
                   className="px-5 py-2.5 rounded text-xs font-semibold border border-stone-gray/40 text-olive-gray hover:text-near-black bg-white hover:bg-warm-sand/20 transition shadow-xs flex items-center gap-1.5 whitespace-nowrap"
                 >
-                  <span>配置多维表</span>
+                  <span>配置多维表格</span>
                   <ArrowRight size={14} />
                 </button>
 
-                {pushResult?.success === true ? (
-                  <a
-                    href={pushResult.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-green-700 hover:bg-green-800 text-white text-xs font-semibold px-6 py-2.5 rounded transition flex items-center gap-1.5 shadow-md hover:scale-[1.01] duration-150 whitespace-nowrap"
-                  >
-                    <CheckCircle2 size={13} className="text-green-200" />
-                    <span>🎉 写入成功！点击前往多维表格查看结果 </span>
-                  </a>
-                ) : (
-                  <button
-                    onClick={handleStep3Push}
-                    disabled={isPushing}
-                    className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-6 py-2.5 rounded transition disabled:opacity-40 flex items-center gap-1.5 shadow-sm whitespace-nowrap"
-                  >
-                    {isPushing && <Loader2 size={12} className="animate-spin" />}
-                    <span>{isPushing ? '正在推送数据...' : '已核对识别结果，一键推送'}</span>
-                  </button>
-                )}
+                {renderPushActionGroup(handleStep3Push, '已核对识别结果，一键推送', false)}
 
                 {pushResult && !pushResult.success && (
                   <div className="border rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs shadow-sm max-w-[280px] border-red-200 bg-red-50 text-error-crimson">
@@ -3529,26 +3813,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
             {activeStep === 4 && (
               <>
-                {pushResult?.success === true ? (
-                  <a
-                    href={pushResult.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-green-700 hover:bg-green-800 text-white text-xs font-semibold px-6 py-2.5 rounded transition flex items-center gap-1.5 shadow-md hover:scale-[1.01] duration-150 whitespace-nowrap"
-                  >
-                    <CheckCircle2 size={13} className="text-green-200" />
-                    <span>🎉 写入成功！点击前往多维表格查看结果 </span>
-                  </a>
-                ) : (
-                  <button
-                    onClick={pushToSpreadsheet}
-                    disabled={isPushing || !isTableConnected || extractedIssues.length === 0}
-                    className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-8 py-2.5 rounded transition disabled:opacity-40 flex items-center gap-1.5 shadow-sm whitespace-nowrap"
-                  >
-                    {isPushing && <Loader2 size={12} className="animate-spin" />}
-                    <span>{isPushing ? '正在推送数据...' : '确认推送'}</span>
-                  </button>
-                )}
+                {renderPushActionGroup(pushToSpreadsheet, '确认推送', !isTableConnected || extractedIssues.length === 0)}
 
                 {pushResult && !pushResult.success && (
                   <div className="border rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs shadow-sm max-w-[280px] border-red-200 bg-red-50 text-error-crimson">

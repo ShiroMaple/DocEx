@@ -281,11 +281,15 @@ class WpsService {
     try {
       const token = await this.getAccessToken(appId, appSecret);
       const sheet = await this.getSchema(null, false, appId, appSecret);
-      const url = `https://openapi.wps.cn/v7/coop/dbsheet/${fileId}/sheets/${sheet.id}/fields/create`;
+      const url = `https://openapi.wps.cn/v7/coop/dbsheet/${fileId}/sheets/${sheet.id}/fields`;
 
       const response = await axios.post(url, {
-        name: fieldName,
-        type: 'Text'
+        fields: [
+          {
+            name: fieldName,
+            type: 'SingleLineText'
+          }
+        ]
       }, {
         headers: {
           Authorization: `Bearer ${token}`,

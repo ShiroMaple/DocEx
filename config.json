@@ -21,7 +21,7 @@
       {
         "id": "default",
         "name": "默认配置",
-        "provider": "Kimi",
+        "provider": "Moonshot",
         "baseUrl": "https://api.moonshot.cn/v1",
         "model": "kimi-k2.7-code",
         "thinkingEffort": "medium",
@@ -31,14 +31,32 @@
       {
         "id": "default-highspeed",
         "name": "高速配置",
-        "provider": "Kimi",
+        "provider": "Moonshot",
         "baseUrl": "https://api.moonshot.cn/v1",
         "model": "kimi-k2.7-code-highspeed",
         "thinkingEffort": "medium",
         "apiKey": "KIMI_API_KEY",
         "isDefault": false
       }
-    ]
+    ],
+    "pricing": {
+      "kimi-k2.6": {
+        "inputPer1M": 6.50,
+        "outputPer1M": 27.00
+      },
+      "kimi-k2.7-code": {
+        "inputPer1M": 6.50,
+        "outputPer1M": 27.00
+      },
+      "kimi-k2.7-code-highspeed": {
+        "inputPer1M": 13.00,
+        "outputPer1M": 54.00
+      },
+      "kimi-k3": {
+        "inputPer1M": 20.00,
+        "outputPer1M": 100.00
+      }
+    }
   },
   "tables": {
     "configs": [
