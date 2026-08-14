@@ -2119,10 +2119,10 @@ export default function DocumentExtractor({ presetId = null }) {
                   const displayIcon = currentPreset.icon || (currentPreset.id === 'default' ? '🌐' : '⚙️');
 
                   return (
-                    <span className="flex items-center justify-center text-sm w-4 h-4 flex-shrink-0">
+                    <span className="flex items-center justify-center text-base w-5 h-5 flex-shrink-0">
                       {typeof displayIcon === 'string' && displayIcon.endsWith('.svg') ? (
                         <span
-                          className="inline-block w-3.5 h-3.5 bg-near-black"
+                          className="inline-block w-4 h-4 bg-terracotta"
                           style={{
                             maskImage: `url(${displayIcon})`,
                             WebkitMaskImage: `url(${displayIcon})`,
