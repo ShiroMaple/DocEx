@@ -42,7 +42,7 @@ jobs:
       # 增加了对 public 目录存在性的安全判断，防止空项目报错
       - name: Package Artifacts
         run: |
-          [ -d public ] && cp -r public .next/standalone/public || echo "No public folder found"
+          [ -d public ] && cp -r public/. .next/standalone/public/ || echo "No public folder found"
           [ -d presets ] && cp -r presets .next/standalone/presets || echo "No presets folder found"
           [ -f config.json ] && cp config.json .next/standalone/config.json || echo "No config.json found"
           [ -f fields.json ] && cp fields.json .next/standalone/fields.json || echo "No fields.json found"

@@ -6,7 +6,7 @@ node_modules/
 .DS_Store
 Thumbs.db
 scratch/
-logs/
+/logs/
 .agents/
 
 # dev logs
