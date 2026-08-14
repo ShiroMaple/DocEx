@@ -245,7 +245,7 @@ export default function AdminLogsPage() {
       </header>
 
       {/* 主面板 */}
-      <main className="max-w-7xl mx-auto px-6 mt-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-6 sm:mt-8">
 
         {/* 筛选工具栏 */}
         <section className="bg-[#faf9f5] border border-[#e8e6dc] rounded-2xl p-4 shadow-sm mb-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">

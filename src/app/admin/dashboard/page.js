@@ -155,12 +155,12 @@ export default function AdminDashboardPage() {
       </header>
 
       {/* 页面主内容 */}
-      <main className="max-w-7xl mx-auto px-8 mt-8 flex flex-col gap-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-8 mt-6 sm:mt-8 flex flex-col gap-6">
 
         {/* 控制台 */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-wrap justify-between items-center gap-3">
           <h2 className="text-lg font-serif font-bold text-near-black">模型使用明细</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* 部门筛选 */}
             <select
               className="bg-white border border-[#e8e6dc] text-xs font-semibold rounded-lg px-3 py-1.5 outline-none focus:ring-1 focus:ring-terracotta cursor-pointer"

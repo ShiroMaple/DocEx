@@ -2017,7 +2017,7 @@ export default function DocumentExtractor({ presetId = null }) {
     if (activeStep === 4) progressWidth = '100%';
 
     return (
-      <div className="w-[600px] relative select-none">
+      <div className="w-full max-w-[600px] relative select-none">
         {/* Background connector line */}
         <div className="absolute top-5 left-5 right-5 h-0.5 bg-warm-sand -translate-y-1/2 z-0">
           {/* Active progress connector line */}
@@ -2046,7 +2046,7 @@ export default function DocumentExtractor({ presetId = null }) {
                 className="flex flex-col items-center justify-center cursor-pointer group w-10 h-10 relative"
               >
                 <div
-                  className={`w-10 h-10 rounded-full border-2 flex items-center justify-center font-bold text-xs transition-all duration-300 ${isDone
+                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 flex items-center justify-center font-bold text-xs transition-all duration-300 ${isDone
                     ? 'border-green-600 bg-green-50 text-green-700'
                     : isActive
                       ? 'border-terracotta bg-ivory text-terracotta shadow-[0_0_8px_rgba(201,100,66,0.35)]'
@@ -2060,9 +2060,9 @@ export default function DocumentExtractor({ presetId = null }) {
                   )}
                 </div>
 
-                <div className="absolute top-12 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
+                <div className="absolute top-11 sm:top-12 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
                   <span
-                    className={`text-xs transition-all duration-300 tracking-wider ${isActive
+                    className={`text-[10px] sm:text-xs transition-all duration-300 tracking-wider ${isActive
                       ? 'text-near-black font-bold'
                       : isDone
                         ? 'text-green-700 font-semibold'
@@ -2099,18 +2099,21 @@ export default function DocumentExtractor({ presetId = null }) {
 
       {/* ── Sticky Global Header Bar ── */}
       <header className="sticky top-0 z-40 bg-parchment/85 backdrop-blur-md border-b border-border-cream">
-        <div className="max-w-[1440px] mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-[1440px] mx-auto px-3 sm:px-6 h-auto min-h-16 py-2 sm:py-0 flex flex-wrap md:flex-nowrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap">
             <a href="/" className="flex items-center gap-2 hover:opacity-90 transition">
-              <FileText className="w-5 h-5 text-terracotta" />
-              <span className="font-serif font-bold text-lg leading-none tracking-tight">DocEx 智能结构化提取文档信息</span>
+              <FileText className="w-5 h-5 text-terracotta flex-shrink-0" />
+              <span className="font-serif font-bold text-base sm:text-lg leading-none tracking-tight">
+                <span className="hidden sm:inline">DocEx 智能结构化提取文档信息</span>
+                <span className="sm:hidden">DocEx 提取</span>
+              </span>
             </a>
 
             {/* Version / Preset Selector Dropdown */}
             <div className="relative popover-container">
               <button
                 onClick={() => setActivePopover(activePopover === 'version' ? null : 'version')}
-                className="text-l font-bold tracking-wider text-near-black bg-warm-sand hover:bg-warm-sand/80 border border-transparent hover:border-stone-gray/30 px-3 py-1.5 rounded-full flex items-center gap-1.5 transition select-none shadow-xs"
+                className="text-xs sm:text-sm font-bold tracking-wider text-near-black bg-warm-sand hover:bg-warm-sand/80 border border-transparent hover:border-stone-gray/30 px-2.5 sm:px-3 py-1.5 rounded-full flex items-center gap-1.5 transition select-none shadow-xs max-w-[200px] sm:max-w-none truncate"
                 title="点击切换页面版本或专有部门预设"
               >
                 {(() => {
@@ -2139,17 +2142,17 @@ export default function DocumentExtractor({ presetId = null }) {
                     </span>
                   );
                 })()}
-                <span>
+                <span className="truncate">
                   {preset
                     ? (preset.badgeText || preset.subtitle || preset.name)
                     : (allPresetsList.find(p => p.id === 'default')?.badgeText || '')}
                 </span>
-                <ChevronDown size={12} className={`text-stone-gray transition-transform duration-200 ${activePopover === 'version' ? 'rotate-180' : ''}`} />
+                <ChevronDown size={12} className={`text-stone-gray transition-transform duration-200 flex-shrink-0 ${activePopover === 'version' ? 'rotate-180' : ''}`} />
               </button>
 
               {/* Dropdown Menu */}
               {activePopover === 'version' && (
-                <div className="absolute left-0 mt-2 w-64 bg-ivory border border-border-cream rounded-xl shadow-xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute left-0 mt-2 w-64 max-w-[90vw] bg-ivory border border-border-cream rounded-xl shadow-xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
                   <div className="text-[12px] font-bold text-stone-gray uppercase tracking-wider px-3 py-1.5">
                     选择系统应用预设版本
                   </div>
@@ -2211,18 +2214,18 @@ export default function DocumentExtractor({ presetId = null }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {/* Popover 1: Table State Dropdown Badge */}
             <div className="relative popover-container">
               <button
                 onClick={() => setActivePopover(activePopover === 'table' ? null : 'table')}
-                className={`status-badge px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 border bg-ivory shadow-sm transition ${isTableConnected
+                className={`status-badge px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold flex items-center gap-1.5 sm:gap-2 border bg-ivory shadow-sm transition max-w-[170px] sm:max-w-none truncate ${isTableConnected
                   ? 'border-green-200 bg-green-50/50 text-green-700'
                   : 'border-border-cream text-olive-gray'
                   }`}
               >
-                <span className={`w-2 h-2 rounded-full ${isTableConnected ? 'bg-green-600 shadow-[0_0_6px_#16a34a]' : 'bg-stone-gray'}`} />
-                <span>{isTableConnected ? `📊 多维表格已连接: ${platform} ${tableName}` : '📊 多维表格未连接'}</span>
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isTableConnected ? 'bg-green-600 shadow-[0_0_6px_#16a34a]' : 'bg-stone-gray'}`} />
+                <span className="truncate">{isTableConnected ? `📊 已连接: ${platform} ${tableName}` : '📊 多维表格未连接'}</span>
               </button>
 
               <AnimatePresence>
@@ -2231,7 +2234,7 @@ export default function DocumentExtractor({ presetId = null }) {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute right-0 mt-2 w-80 bg-ivory border border-warm-sand rounded-lg p-5 shadow-lg z-50 text-near-black"
+                    className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-ivory border border-warm-sand rounded-lg p-4 sm:p-5 shadow-lg z-50 text-near-black"
                   >
                     <h4 className="font-serif font-medium text-sm border-b border-border-cream pb-2 mb-3">多维表格网关</h4>
 
@@ -2437,8 +2440,8 @@ export default function DocumentExtractor({ presetId = null }) {
                   : 'border-border-cream text-olive-gray'
                   }`}
               >
-                <span className={`w-2 h-2 rounded-full ${llmConnected ? 'bg-green-600 shadow-[0_0_6px_#16a34a]' : 'bg-stone-gray'}`} />
-                <span>{llmConnected ? `🤖 模型已验证: ${llmConfig.provider} ${llmConfig.model} (${llmSupportVision ? '多模态模型' : '纯文本模型'})` : '🤖 模型未验证'}</span>
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${llmConnected ? 'bg-green-600 shadow-[0_0_6px_#16a34a]' : 'bg-stone-gray'}`} />
+                <span className="truncate">{llmConnected ? `🤖 ${llmConfig.provider} ${llmConfig.model}` : '🤖 模型未验证'}</span>
               </button>
 
               <AnimatePresence>
@@ -2447,7 +2450,7 @@ export default function DocumentExtractor({ presetId = null }) {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute right-0 mt-2 w-80 bg-ivory border border-warm-sand rounded-lg p-5 shadow-lg z-50 text-near-black"
+                    className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-ivory border border-warm-sand rounded-lg p-4 sm:p-5 shadow-lg z-50 text-near-black"
                   >
                     <h4 className="font-serif font-medium text-sm border-b border-border-cream pb-2 mb-3">AI模型网关配置</h4>
 
@@ -2552,7 +2555,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
 
       {/* ── Main Stream Workspace with Framer Motion Page Switching ── */}
-      <main className="max-w-[1440px] mx-auto px-6 mt-4">
+      <main className="max-w-[1440px] mx-auto px-3 sm:px-6 mt-4">
 
         <AnimatePresence mode="wait">
           {activeStep === 1 && (
@@ -2565,7 +2568,7 @@ export default function DocumentExtractor({ presetId = null }) {
               className="flex flex-col gap-6"
             >
               {/* STEP 1 Card */}
-              <section className="bg-ivory border border-border-cream rounded-xl p-8 shadow-sm">
+              <section className="bg-ivory border border-border-cream rounded-xl p-4 sm:p-6 md:p-8 shadow-sm">
                 <div className="flex items-center gap-3 mb-6">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-terracotta">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -2584,7 +2587,7 @@ export default function DocumentExtractor({ presetId = null }) {
                       onDragOver={handleDrag}
                       onDragLeave={handleDrag}
                       onDrop={handleDrop}
-                      className={`border border-dashed rounded-lg py-24 px-6 flex flex-col items-center justify-center cursor-pointer transition select-none flex-1 min-h-[400px] ${dragActive
+                      className={`border border-dashed rounded-lg py-12 sm:py-24 px-4 sm:px-6 flex flex-col items-center justify-center cursor-pointer transition select-none flex-1 min-h-[220px] sm:min-h-[340px] md:min-h-[400px] ${dragActive
                         ? 'border-terracotta bg-terracotta/[0.02]'
                         : 'border-stone-gray hover:border-terracotta hover:bg-terracotta/[0.01]'
                         }`}
@@ -2600,7 +2603,7 @@ export default function DocumentExtractor({ presetId = null }) {
                   </div>
 
                   {/* Right side: Pending Documents list (1/2 width) */}
-                  <div className="flex flex-col bg-warm-sand/15 border border-border-cream rounded-lg p-5">
+                  <div className="flex flex-col bg-warm-sand/15 border border-border-cream rounded-lg p-3 sm:p-5">
                     <h3 className="text-xs font-bold text-near-black mb-3">待处理文档队列 ({filesQueue.length})</h3>
                     {filesQueue.length === 0 ? (
                       <div className="flex-1 flex flex-col items-center justify-center text-stone-gray py-8">
@@ -2608,7 +2611,7 @@ export default function DocumentExtractor({ presetId = null }) {
                         <span className="text-xs">暂无待处理文档，请从左侧上传或在下方历史中复用</span>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-4 gap-3 overflow-y-auto max-h-[390px] custom-scrollbar">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 overflow-y-auto max-h-[390px] custom-scrollbar">
                         {filesQueue.map(item => (
                           <div
                             key={item.tempId || item.md5}
@@ -2748,14 +2751,14 @@ export default function DocumentExtractor({ presetId = null }) {
 
                 {/* Left column: Matrix Grid (2/3 width) */}
                 <div className="lg:col-span-2 relative">
-                  <section className="bg-ivory border border-border-cream rounded-xl p-8 shadow-sm">
+                  <section className="bg-ivory border border-border-cream rounded-xl p-4 sm:p-6 md:p-8 shadow-sm">
                     <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
                       <div className="flex items-center gap-3">
                         <Sparkles className="w-5 h-5 text-terracotta" />
                         <h2 className="font-serif font-medium text-lg">步骤 2: 配置字段</h2>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {preset?.allowSwitchFields && preset?.availableFieldsList?.length > 0 && (
                           <div className="flex items-center gap-1.5 text-xs text-olive-gray mr-2">
                             <span className="font-semibold whitespace-nowrap">📋 字段配置：</span>
@@ -2862,14 +2865,14 @@ export default function DocumentExtractor({ presetId = null }) {
                       配置您想让大模型提取的字段，并与云端多维表格的目标列进行匹配映射。
                     </p>
 
-                    <div className="border border-border-cream rounded-lg overflow-hidden bg-white mb-6">
-                      <table className="w-full border-collapse text-left text-xs table-fixed">
+                    <div className="border border-border-cream rounded-lg overflow-x-auto bg-white mb-6 custom-scrollbar">
+                      <table className="w-full border-collapse text-left text-xs table-fixed min-w-[560px]">
                         <thead>
                           <tr className="bg-parchment border-b border-border-cream">
-                            <th className="p-4 font-bold text-near-black w-[22%] whitespace-nowrap">提取字段</th>
-                            <th className="p-4 font-bold text-near-black w-[38%] whitespace-nowrap">描述</th>
-                            <th className="p-4 font-bold text-near-black w-[28%] whitespace-nowrap">示例</th>
-                            <th className="p-4 font-bold text-near-black text-center w-[12%] whitespace-nowrap">操作</th>
+                            <th className="p-3 sm:p-4 font-bold text-near-black w-[22%] whitespace-nowrap">提取字段</th>
+                            <th className="p-3 sm:p-4 font-bold text-near-black w-[38%] whitespace-nowrap">描述</th>
+                            <th className="p-3 sm:p-4 font-bold text-near-black w-[28%] whitespace-nowrap">示例</th>
+                            <th className="p-3 sm:p-4 font-bold text-near-black text-center w-[12%] whitespace-nowrap">操作</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border-cream">
@@ -2881,7 +2884,7 @@ export default function DocumentExtractor({ presetId = null }) {
                             return (
                               <tr key={index} className="hover:bg-ivory/40 transition">
                                 {/* Column 1: Label */}
-                                <td className="p-4 align-top">
+                                <td className="p-3 sm:p-4 align-top">
                                   <input
                                     type="text"
                                     value={f.label}
@@ -2893,7 +2896,7 @@ export default function DocumentExtractor({ presetId = null }) {
                                 </td>
 
                                 {/* Column 2: Description */}
-                                <td className="p-4 align-top">
+                                <td className="p-3 sm:p-4 align-top">
                                   <textarea
                                     value={f.desc}
                                     onChange={(e) => updateFieldCell(index, 'desc', e.target.value)}
@@ -2905,7 +2908,7 @@ export default function DocumentExtractor({ presetId = null }) {
                                 </td>
 
                                 {/* Column 3: Example */}
-                                <td className="p-4 align-top">
+                                <td className="p-3 sm:p-4 align-top">
                                   <textarea
                                     value={f.example}
                                     onChange={(e) => updateFieldCell(index, 'example', e.target.value)}
@@ -2916,7 +2919,7 @@ export default function DocumentExtractor({ presetId = null }) {
                                   />
                                 </td>
 
-                                <td className="p-4 align-top text-center">
+                                <td className="p-3 sm:p-4 align-top text-center">
                                   <div className="flex items-center justify-center gap-2 flex-nowrap w-full">
                                     {/* 2x2 控制盘 */}
                                     <div className="grid grid-cols-2 gap-0.5 w-[46px] flex-shrink-0">
@@ -2993,7 +2996,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
                   {/* 🔮 自动识别半透明加载浮层 */}
                   {isDetectingFields && (
-                    <div className="absolute inset-0 bg-white/75 backdrop-blur-[1.5px] rounded-xl z-20 flex flex-col p-8 select-none animate-fade-in">
+                    <div className="absolute inset-0 bg-white/75 backdrop-blur-[1.5px] rounded-xl z-20 flex flex-col p-4 sm:p-6 md:p-8 select-none animate-fade-in">
                       <div className="flex items-center justify-between mb-4 border-b border-border-cream pb-3 flex-shrink-0">
                         <div className="flex items-center gap-2.5 text-terracotta font-serif font-bold text-sm">
                           <Loader2 size={16} className="animate-spin text-terracotta" />
@@ -3007,7 +3010,7 @@ export default function DocumentExtractor({ presetId = null }) {
                         </button>
                       </div>
 
-                      <div className="flex-1 bg-parchment/60 border border-border-cream rounded-lg p-5 flex flex-col gap-2 min-h-0">
+                      <div className="flex-1 bg-parchment/60 border border-border-cream rounded-lg p-3 sm:p-5 flex flex-col gap-2 min-h-0">
                         <div className="flex items-center justify-between text-[10px] font-bold text-stone-gray uppercase tracking-wider">
                           <span>AI 实时推理输出：</span>
                           {detectingStreamText && (
@@ -3026,7 +3029,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
                 {/* Right column: AI Prompt config (1/3 width) */}
                 <div className="lg:col-span-1">
-                  <section className="bg-ivory border border-border-cream rounded-xl p-8 shadow-sm">
+                  <section className="bg-ivory border border-border-cream rounded-xl p-4 sm:p-6 md:p-8 shadow-sm">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-serif font-medium text-sm flex items-center gap-2">
                         <Sparkles size={16} className="text-terracotta" />
@@ -3204,7 +3207,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
                 {/* Right column: Table credentials & mappings (1/3 width) */}
                 <div className="lg:col-span-1">
-                  <section className="bg-ivory border border-border-cream rounded-xl p-8 shadow-sm">
+                  <section className="bg-ivory border border-border-cream rounded-xl p-4 sm:p-6 md:p-8 shadow-sm">
                     <h3 className="font-serif font-bold text-base border-b border-border-cream pb-3 mb-4 flex items-center gap-2">
                       <span>📊</span> 推送配置面板
                     </h3>
@@ -3337,7 +3340,7 @@ export default function DocumentExtractor({ presetId = null }) {
               className="flex flex-col gap-6"
             >
               {/* STEP 3 results card */}
-              <section className="bg-ivory border border-border-cream rounded-xl p-8 shadow-sm">
+              <section className="bg-ivory border border-border-cream rounded-xl p-4 sm:p-6 md:p-8 shadow-sm">
                 <div className="flex items-center gap-3 mb-6">
                   <FileCheck className="w-5 h-5 text-terracotta" />
                   <h2 className="font-serif font-medium text-lg">步骤 3: 解析结果</h2>
@@ -3345,7 +3348,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
                 {/* ⏳ Real-time Extraction Progress indicator */}
                 {extractingProgress && (
-                  <div className="border border-border-warm bg-warm-sand/10 rounded-xl p-5 mb-6 flex flex-col gap-4 shadow-sm">
+                  <div className="border border-border-warm bg-warm-sand/10 rounded-xl p-4 sm:p-5 mb-6 flex flex-col gap-4 shadow-sm">
                     <div className="flex items-center justify-between text-xs text-olive-gray font-semibold">
                       <div className="flex items-center gap-2">
                         {isExtracting ? (
@@ -3479,7 +3482,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
                 {/* Local validation warning / LLM error response */}
                 {extractionError && (
-                  <div className="border border-red-200 bg-red-50/50 rounded-lg p-5 flex gap-3 text-xs text-error-crimson mb-6">
+                  <div className="border border-red-200 bg-red-50/50 rounded-lg p-4 sm:p-5 flex gap-3 text-xs text-error-crimson mb-6">
                     <ShieldAlert className="w-5 h-5 flex-shrink-0" />
                     <div>
                       <p className="font-bold">安全审查拦截或请求异常</p>
@@ -3490,7 +3493,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
                 {/* Circuit Breaker Warning Card */}
                 {extractedIssues.length === 0 && !isExtracting && !extractionError && (
-                  <div className="border border-red-200 bg-red-50/50 rounded-lg p-5 flex flex-col gap-3 text-xs text-error-crimson mb-6">
+                  <div className="border border-red-200 bg-red-50/50 rounded-lg p-4 sm:p-5 flex flex-col gap-3 text-xs text-error-crimson mb-6">
                     <div className="flex gap-3">
                       <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                       <div>
@@ -3520,24 +3523,24 @@ export default function DocumentExtractor({ presetId = null }) {
 
                     {/* Clean Token stats */}
                     {tokenUsage && (
-                      <div className="flex items-center gap-6 bg-warm-sand/20 border border-border-cream rounded-lg p-4 text-xs font-semibold text-olive-gray">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 md:gap-6 bg-warm-sand/20 border border-border-cream rounded-lg p-3 sm:p-4 text-xs font-semibold text-olive-gray">
                         <div className="flex items-center gap-2">
-                          <span>📊 AI模型开销统计:</span>
+                          <span>📊 AI模型开销:</span>
                         </div>
                         <div>
-                          输入 Tokens <span className="text-near-black font-bold">{tokenUsage.promptTokens?.toLocaleString()}</span>
+                          输入 <span className="text-near-black font-bold">{tokenUsage.promptTokens?.toLocaleString()}</span>
                         </div>
-                        <div className="w-px h-3 bg-border-warm" />
+                        <div className="w-px h-3 bg-border-warm hidden sm:block" />
                         <div>
-                          输出 Tokens <span className="text-near-black font-bold">{tokenUsage.completionTokens?.toLocaleString()}</span>
+                          输出 <span className="text-near-black font-bold">{tokenUsage.completionTokens?.toLocaleString()}</span>
                         </div>
-                        <div className="w-px h-3 bg-border-warm" />
+                        <div className="w-px h-3 bg-border-warm hidden sm:block" />
                         <div>
-                          共计 Tokens <span className="text-near-black font-bold">{tokenUsage.totalTokens?.toLocaleString()}</span>
+                          共计 <span className="text-near-black font-bold">{tokenUsage.totalTokens?.toLocaleString()}</span>
                         </div>
                         {elapsedTime !== null && (
                           <>
-                            <div className="w-px h-3 bg-border-warm" />
+                            <div className="w-px h-3 bg-border-warm hidden sm:block" />
                             <div>
                               总耗时 <span className="text-near-black font-bold">{elapsedTime.toFixed(1)}</span> 秒
                             </div>
@@ -3547,7 +3550,7 @@ export default function DocumentExtractor({ presetId = null }) {
                     )}
 
                     {/* Action Toolbar above table header */}
-                    <div className="flex justify-between items-center gap-4 flex-wrap">
+                    <div className="flex justify-between items-center gap-3 sm:gap-4 flex-wrap">
                       <div className="flex items-center gap-2 flex-wrap">
                         {extractedIssues.length > 0 && (
                           <span className="text-xs bg-warm-sand/80 text-olive-gray font-semibold px-3 py-1.5 rounded border border-border-cream mr-1">
@@ -3746,15 +3749,15 @@ export default function DocumentExtractor({ presetId = null }) {
       </main>
 
       {/* ── Sticky Bottom Action Bar ── */}
-      <div className="sticky bottom-0 left-0 right-0 z-30 border-t border-border-cream bg-[#f5f4ed]/85 backdrop-blur-md pt-5 pb-9 shadow-[0_-4px_12px_rgba(20,20,19,0.03)] mt-12">
-        <div className="max-w-[1440px] mx-auto px-6 grid grid-cols-3 items-center">
+      <div className="sticky bottom-0 left-0 right-0 z-30 border-t border-border-cream bg-[#f5f4ed]/90 backdrop-blur-md pt-3 pb-6 md:pt-5 md:pb-9 shadow-[0_-4px_12px_rgba(20,20,19,0.03)] mt-8 sm:mt-12">
+        <div className="max-w-[1440px] mx-auto px-3 sm:px-6 flex flex-col md:grid md:grid-cols-3 gap-3 md:gap-0 items-center">
 
           {/* Left Side Buttons */}
-          <div className="flex justify-start">
+          <div className="w-full md:w-auto flex justify-start order-2 md:order-1">
             {activeStep === 2 && (
               <button
                 onClick={() => setActiveStep(1)}
-                className="border border-stone-gray hover:border-near-black text-olive-gray hover:text-near-black px-4 py-2 rounded text-xs font-semibold flex items-center gap-1.5 transition bg-white shadow-sm"
+                className="border border-stone-gray hover:border-near-black text-olive-gray hover:text-near-black px-3.5 sm:px-4 py-2 rounded text-xs font-semibold flex items-center gap-1.5 transition bg-white shadow-sm"
               >
                 <ArrowLeft size={14} />
                 <span>返回上一步</span>
@@ -3763,7 +3766,7 @@ export default function DocumentExtractor({ presetId = null }) {
             {activeStep === 3 && (
               <button
                 onClick={() => setActiveStep(2)}
-                className="border border-stone-gray hover:border-near-black text-olive-gray hover:text-near-black px-4 py-2 rounded text-xs font-semibold flex items-center gap-1.5 transition bg-white shadow-sm"
+                className="border border-stone-gray hover:border-near-black text-olive-gray hover:text-near-black px-3.5 sm:px-4 py-2 rounded text-xs font-semibold flex items-center gap-1.5 transition bg-white shadow-sm"
               >
                 <ArrowLeft size={14} />
                 <span>返回上一步</span>
@@ -3772,7 +3775,7 @@ export default function DocumentExtractor({ presetId = null }) {
             {activeStep === 4 && (
               <button
                 onClick={() => setActiveStep(3)}
-                className="border border-stone-gray hover:border-near-black text-olive-gray hover:text-near-black px-4 py-2 rounded text-xs font-semibold flex items-center gap-1.5 transition bg-white shadow-sm"
+                className="border border-stone-gray hover:border-near-black text-olive-gray hover:text-near-black px-3.5 sm:px-4 py-2 rounded text-xs font-semibold flex items-center gap-1.5 transition bg-white shadow-sm"
               >
                 <ArrowLeft size={14} />
                 <span>返回上一步</span>
@@ -3781,12 +3784,12 @@ export default function DocumentExtractor({ presetId = null }) {
           </div>
 
           {/* Center: Progress indicators */}
-          <div className="flex justify-center">
+          <div className="w-full flex justify-center order-1 md:order-2 pb-1 md:pb-0">
             {renderWizardIndicator()}
           </div>
 
           {/* Right Side Buttons */}
-          <div className="flex justify-end items-center gap-3">
+          <div className="w-full md:w-auto flex justify-end items-center gap-2 sm:gap-3 flex-wrap order-3">
             {activeStep === 1 && (
               <>
                 <button
@@ -3800,11 +3803,11 @@ export default function DocumentExtractor({ presetId = null }) {
                     startExtraction();
                   }}
                   disabled={isDetectingFields || filesQueue.filter(f => f.status === 'done').length === 0}
-                  className="px-4 py-2.5 rounded text-xs font-semibold border border-terracotta/40 bg-terracotta/10 text-terracotta hover:bg-terracotta/20 transition flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed shadow-xs"
+                  className="px-3 sm:px-4 py-2.5 rounded text-xs font-semibold border border-terracotta/40 bg-terracotta/10 text-terracotta hover:bg-terracotta/20 transition flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed shadow-xs"
                   title={isDetectingFields ? "请等待自动识别字段完成" : "直接跳过配置字段，以默认的字段进行解析"}
                 >
                   <Sparkles size={14} />
-                  <span>跳过配置字段，立即解析</span>
+                  <span>跳过配置，立即解析</span>
                 </button>
 
                 <button
@@ -3815,7 +3818,7 @@ export default function DocumentExtractor({ presetId = null }) {
                     }
                     setActiveStep(2);
                   }}
-                  className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-8 py-2.5 rounded transition flex items-center gap-1.5 shadow-sm hover:animate-none"
+                  className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-5 sm:px-8 py-2.5 rounded transition flex items-center gap-1.5 shadow-sm hover:animate-none"
                 >
                   <span>下一步：配置字段</span>
                   <ArrowRight size={14} />
@@ -3830,7 +3833,7 @@ export default function DocumentExtractor({ presetId = null }) {
                     <button
                       onClick={startExtraction}
                       disabled={isExtracting || isDetectingFields || filesQueue.filter(f => f.status === 'done').length === 0}
-                      className="px-5 py-2.5 rounded text-xs font-semibold border border-terracotta/40 bg-terracotta/10 text-terracotta hover:bg-terracotta/20 transition flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed shadow-xs"
+                      className="px-4 sm:px-5 py-2.5 rounded text-xs font-semibold border border-terracotta/40 bg-terracotta/10 text-terracotta hover:bg-terracotta/20 transition flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed shadow-xs"
                       title={isDetectingFields ? "请等待自动识别字段完成" : "以当前配置的字段重新发起文档分析提取"}
                     >
                       {isExtracting && <Loader2 size={12} className="animate-spin" />}
@@ -3840,7 +3843,7 @@ export default function DocumentExtractor({ presetId = null }) {
                     <button
                       onClick={() => setActiveStep(3)}
                       disabled={isExtracting || isDetectingFields}
-                      className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-8 py-2.5 rounded transition flex items-center gap-1.5 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-5 sm:px-8 py-2.5 rounded transition flex items-center gap-1.5 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <span>查看已解析的结果</span>
                       <ArrowRight size={14} />
@@ -3850,7 +3853,7 @@ export default function DocumentExtractor({ presetId = null }) {
                   <button
                     onClick={startExtraction}
                     disabled={isExtracting || isDetectingFields || filesQueue.filter(f => f.status === 'done').length === 0}
-                    className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-8 py-2.5 rounded transition flex items-center gap-1.5 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="bg-terracotta hover:bg-terracotta-hover text-ivory text-xs font-semibold px-5 sm:px-8 py-2.5 rounded transition flex items-center gap-1.5 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
                     title={isDetectingFields ? "请等待自动识别字段完成" : ""}
                   >
                     {isExtracting ? (
@@ -3873,7 +3876,7 @@ export default function DocumentExtractor({ presetId = null }) {
               <>
                 <button
                   onClick={() => setActiveStep(4)}
-                  className="px-5 py-2.5 rounded text-xs font-semibold border border-stone-gray/40 text-olive-gray hover:text-near-black bg-white hover:bg-warm-sand/20 transition shadow-xs flex items-center gap-1.5 whitespace-nowrap"
+                  className="px-4 sm:px-5 py-2.5 rounded text-xs font-semibold border border-stone-gray/40 text-olive-gray hover:text-near-black bg-white hover:bg-warm-sand/20 transition shadow-xs flex items-center gap-1.5 whitespace-nowrap"
                 >
                   <span>配置多维表格</span>
                   <ArrowRight size={14} />
@@ -3917,12 +3920,12 @@ export default function DocumentExtractor({ presetId = null }) {
       {/* ── LLM Raw Output Modal ── */}
       <AnimatePresence>
         {isLlmModalOpen && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-ivory border border-warm-sand w-full max-w-2xl rounded-xl p-6 shadow-2xl text-near-black flex flex-col max-h-[85vh]"
+              className="bg-ivory border border-warm-sand w-full max-w-2xl rounded-xl p-4 sm:p-6 shadow-2xl text-near-black flex flex-col max-h-[85vh]"
             >
               <div className="flex items-center justify-between border-b border-border-cream pb-3 mb-4">
                 <div className="flex items-center gap-2">
@@ -3937,13 +3940,13 @@ export default function DocumentExtractor({ presetId = null }) {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-auto bg-warm-sand/30 border border-border-cream p-4 rounded-lg custom-scrollbar">
+              <div className="flex-1 overflow-auto bg-warm-sand/30 border border-border-cream p-3 sm:p-4 rounded-lg custom-scrollbar">
                 <pre className="text-xs font-mono text-near-black whitespace-pre-wrap break-all leading-relaxed select-text">
                   {rawLlmResponse}
                 </pre>
               </div>
 
-              <div className="flex justify-end gap-3 mt-4 border-t border-border-cream pt-4">
+              <div className="flex justify-end gap-3 mt-4 border-t border-border-cream pt-4 flex-wrap">
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(rawLlmResponse);
@@ -3968,12 +3971,12 @@ export default function DocumentExtractor({ presetId = null }) {
       {/* ── Detailed Record Review & Edit Modal ── */}
       <AnimatePresence>
         {activeReviewIndex !== null && extractedIssues[activeReviewIndex] && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-ivory border border-warm-sand w-full max-w-4xl rounded-xl p-6 shadow-2xl text-near-black flex flex-col max-h-[85vh]"
+              className="bg-ivory border border-warm-sand w-full max-w-4xl rounded-xl p-4 sm:p-6 shadow-2xl text-near-black flex flex-col max-h-[85vh]"
             >
               <div className="flex items-center justify-between border-b border-border-cream pb-3 mb-4">
                 <div className="flex items-center gap-2">
