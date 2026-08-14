@@ -2110,9 +2110,35 @@ export default function DocumentExtractor({ presetId = null }) {
             <div className="relative popover-container">
               <button
                 onClick={() => setActivePopover(activePopover === 'version' ? null : 'version')}
-                className="text-l font-bold tracking-wider text-olive-black bg-warm-sand hover:bg-warm-sand/80 border border-transparent hover:border-stone-gray/30 px-3 py-1 rounded-full flex items-center gap-1.5 transition select-none shadow-xs"
+                className="text-l font-bold tracking-wider text-olive-black bg-warm-sand hover:bg-warm-sand/80 border border-transparent hover:border-stone-gray/30 px-3 py-1.5 rounded-full flex items-center gap-1.5 transition select-none shadow-xs"
                 title="点击切换页面版本或专有部门预设"
               >
+                {(() => {
+                  const currentPreset = preset || allPresetsList.find(p => p.id === 'default');
+                  if (!currentPreset) return null;
+                  const displayIcon = currentPreset.icon || (currentPreset.id === 'default' ? '🌐' : '⚙️');
+
+                  return (
+                    <span className="flex items-center justify-center text-sm w-4 h-4 flex-shrink-0">
+                      {typeof displayIcon === 'string' && displayIcon.endsWith('.svg') ? (
+                        <span
+                          className="inline-block w-3.5 h-3.5 bg-olive-black"
+                          style={{
+                            maskImage: `url(${displayIcon})`,
+                            WebkitMaskImage: `url(${displayIcon})`,
+                            maskSize: 'contain',
+                            WebkitMaskSize: 'contain',
+                            maskPosition: 'center',
+                            WebkitMaskPosition: 'center',
+                            maskRepeat: 'no-repeat',
+                          }}
+                        />
+                      ) : (
+                        <span>{displayIcon}</span>
+                      )}
+                    </span>
+                  );
+                })()}
                 <span>
                   {preset
                     ? (preset.badgeText || preset.subtitle || preset.name)

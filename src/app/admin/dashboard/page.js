@@ -118,7 +118,7 @@ export default function AdminDashboardPage() {
               <span className="p-1.5 bg-terracotta text-white rounded-lg">
                 <BarChart2 size={18} />
               </span>
-              <h1 className="text-xl font-bold font-serif text-[#141413]">统计与开销大盘</h1>
+              <h1 className="text-xl font-bold font-serif text-[#141413]">统计与开销看板</h1>
             </div>
 
             {/* Admin 统一导航 Tab */}
@@ -127,7 +127,7 @@ export default function AdminDashboardPage() {
                 <Terminal size={14} /> 操作日志
               </Link>
               <Link href="/admin/dashboard" className={`px-4 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${pathname === '/admin/dashboard' ? 'bg-white shadow-sm text-near-black' : 'text-stone-500 hover:text-near-black'}`}>
-                <BarChart2 size={14} /> 统计大盘
+                <BarChart2 size={14} /> 统计看板
               </Link>
             </div>
           </div>
@@ -231,7 +231,7 @@ export default function AdminDashboardPage() {
                 <FileText className="absolute -right-4 -bottom-4 text-stone-100 opacity-50 group-hover:scale-110 transition-transform duration-500" size={100} />
               </div>
               <div className="bg-white p-5 rounded-2xl border border-[#e8e6dc] shadow-sm flex flex-col gap-2 relative overflow-hidden group">
-                <div className="text-xs font-semibold text-terracotta uppercase tracking-wider z-10">总预估花销 (CNY)</div>
+                <div className="text-xs font-semibold text-terracotta uppercase tracking-wider z-10">总预估开销 (CNY)</div>
                 <div className="text-3xl font-mono font-bold text-terracotta z-10">{stats.summary.totalCost.toFixed(2)}</div>
                 <JapaneseYen className="absolute -right-4 -bottom-4 text-terracotta/5 opacity-50 group-hover:scale-110 transition-transform duration-500" size={100} />
               </div>
@@ -275,7 +275,7 @@ export default function AdminDashboardPage() {
                         <th className="py-3 font-semibold text-right">请求数</th>
                         <th className="py-3 font-semibold text-right">输入 Tokens</th>
                         <th className="py-3 font-semibold text-right">输出 Tokens</th>
-                        <th className="py-3 font-semibold text-right text-terracotta">总花销</th>
+                        <th className="py-3 font-semibold text-right text-terracotta">总开销</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#e8e6dc]">
