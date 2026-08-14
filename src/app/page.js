@@ -1903,8 +1903,8 @@ export default function DocumentExtractor({ presetId = null }) {
           onClick={() => setIsPushMenuOpen(!isPushMenuOpen)}
           disabled={isPushing}
           className={`text-white text-xs font-semibold px-3 py-2.5 rounded-r transition flex items-center shadow-md hover:scale-[1.01] duration-150 disabled:opacity-40 ${isSuccess
-              ? 'bg-[#6fcf97] hover:bg-[#5bbd84]'
-              : 'bg-terracotta hover:bg-terracotta-hover'
+            ? 'bg-[#6fcf97] hover:bg-[#5bbd84]'
+            : 'bg-terracotta hover:bg-terracotta-hover'
             }`}
           title="展开操作菜单"
         >
@@ -2122,7 +2122,7 @@ export default function DocumentExtractor({ presetId = null }) {
                     <span className="flex items-center justify-center text-base w-5 h-5 flex-shrink-0">
                       {typeof displayIcon === 'string' && displayIcon.endsWith('.svg') ? (
                         <span
-                          className="inline-block w-4 h-4 bg-terracotta"
+                          className="inline-block w-5 h-5 bg-terracotta"
                           style={{
                             maskImage: `url(${displayIcon})`,
                             WebkitMaskImage: `url(${displayIcon})`,
