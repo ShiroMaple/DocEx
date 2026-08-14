@@ -2110,7 +2110,7 @@ export default function DocumentExtractor({ presetId = null }) {
             <div className="relative popover-container">
               <button
                 onClick={() => setActivePopover(activePopover === 'version' ? null : 'version')}
-                className="text-l font-bold tracking-wider text-olive-black bg-warm-sand hover:bg-warm-sand/80 border border-transparent hover:border-stone-gray/30 px-3 py-1.5 rounded-full flex items-center gap-1.5 transition select-none shadow-xs"
+                className="text-l font-bold tracking-wider text-near-black bg-warm-sand hover:bg-warm-sand/80 border border-transparent hover:border-stone-gray/30 px-3 py-1.5 rounded-full flex items-center gap-1.5 transition select-none shadow-xs"
                 title="点击切换页面版本或专有部门预设"
               >
                 {(() => {
@@ -2122,7 +2122,7 @@ export default function DocumentExtractor({ presetId = null }) {
                     <span className="flex items-center justify-center text-sm w-4 h-4 flex-shrink-0">
                       {typeof displayIcon === 'string' && displayIcon.endsWith('.svg') ? (
                         <span
-                          className="inline-block w-3.5 h-3.5 bg-olive-black"
+                          className="inline-block w-3.5 h-3.5 bg-near-black"
                           style={{
                             maskImage: `url(${displayIcon})`,
                             WebkitMaskImage: `url(${displayIcon})`,
