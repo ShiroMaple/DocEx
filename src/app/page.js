@@ -206,6 +206,12 @@ export default function DocumentExtractor({ presetId = null }) {
   const [fileStatusMap, setFileStatusMap] = useState({}); // { [md5]: 'pending' | 'processing' | 'success' | 'error' }
   const [extractionError, setExtractionError] = useState('');
   const [extractedIssues, setExtractedIssues] = useState([]);
+  const [isLlmOutputExpanded, setIsLlmOutputExpanded] = useState(true);
+  const [customColWidths, setCustomColWidths] = useState({});
+
+  useEffect(() => {
+    setCustomColWidths({});
+  }, [preset, fields]);
   const [fileFilteredCountMap, setFileFilteredCountMap] = useState({});
   const totalFilteredCount = Object.values(fileFilteredCountMap).reduce((sum, count) => sum + count, 0);
   const [fileEstPromptTokensMap, setFileEstPromptTokensMap] = useState({});
@@ -242,7 +248,10 @@ export default function DocumentExtractor({ presetId = null }) {
   const step4FieldWidths = fields.map((f, idx) => getColWidthPx(f.key || `field_${idx + 1}`, f.label || `列_${idx + 1}`, extractedIssues));
   const step4TotalWidth = 50 + 120 + step4FieldWidths.reduce((a, b) => a + b, 0);
 
-  const step3FieldWidths = fields.map((f, idx) => getColWidthPx(f.key || `field_${idx + 1}`, f.label || `列_${idx + 1}`, extractedIssues));
+  const step3FieldWidths = fields.map((f, idx) => {
+    if (customColWidths[idx] !== undefined) return customColWidths[idx];
+    return getColWidthPx(f.key || `field_${idx + 1}`, f.label || `列_${idx + 1}`, extractedIssues);
+  });
   const step3TotalWidth = 50 + 100 + step3FieldWidths.reduce((a, b) => a + b, 0) + 80;
   const [isPushing, setIsPushing] = useState(false);
   const [pushResult, setPushResult] = useState(null);
@@ -1326,7 +1335,9 @@ export default function DocumentExtractor({ presetId = null }) {
             userPrompt: '请分析该文档并提取结构化字段：',
             fields: processedFields,
             llmConfig,
-            postFilters: preset?.postFilters
+            postFilters: preset?.postFilters,
+            presetId: preset?.id || 'unknown',
+            department: preset?.department || 'unknown'
           })
         });
 
@@ -1563,7 +1574,9 @@ export default function DocumentExtractor({ presetId = null }) {
           userPrompt: '请分析该文档并提取结构化字段：',
           fields: processedFields,
           llmConfig,
-          postFilters: preset?.postFilters
+          postFilters: preset?.postFilters,
+          presetId: preset?.id || 'unknown',
+          department: preset?.department || 'unknown'
         })
       });
 
@@ -2024,7 +2037,7 @@ export default function DocumentExtractor({ presetId = null }) {
               <div
                 key={step.number}
                 onClick={() => {
-                  if (step.number === 3 && extractedIssues.length === 0 && !extractionError) {
+                  if (step.number === 3 && extractedIssues.length === 0 && !extractionError && !isExtracting) {
                     showToast('请先按步骤执行信息解析提取！');
                     return;
                   }
@@ -2880,7 +2893,7 @@ export default function DocumentExtractor({ presetId = null }) {
                                 <td className="p-4 align-top text-center">
                                   <div className="flex items-center justify-center gap-2 flex-nowrap w-full">
                                     {/* 2x2 控制盘 */}
-                                    <div className="grid grid-cols-2 gap-0.5 bg-warm-sand/20 p-0.5 rounded border border-border-cream w-[46px] flex-shrink-0">
+                                    <div className="grid grid-cols-2 gap-0.5 w-[46px] flex-shrink-0">
                                       <button
                                         onClick={() => moveFieldItem(index, 'top')}
                                         disabled={index === 0}
@@ -3408,13 +3421,33 @@ export default function DocumentExtractor({ presetId = null }) {
 
                 {isExtracting && rawLlmResponse && (
                   <div className="border border-border-cream rounded-lg bg-parchment p-4 mb-6 shadow-inner animate-fade-in">
-                    <p className="text-xs font-bold text-olive-gray mb-2 flex items-center gap-1.5 animate-pulse">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-terracotta animate-ping" />
-                      <span>🤖 大模型实时解析输出中...</span>
-                    </p>
-                    <pre className="text-[11px] font-mono text-near-black overflow-auto max-h-72 p-3 bg-white rounded border border-border-cream whitespace-pre-wrap break-words leading-relaxed">
-                      {rawLlmResponse}
-                    </pre>
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-xs font-bold text-olive-gray flex items-center gap-1.5 animate-pulse">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-terracotta animate-ping" />
+                        <span>🤖 大模型实时解析输出中...</span>
+                      </p>
+                      <button
+                        onClick={() => setIsLlmOutputExpanded(!isLlmOutputExpanded)}
+                        className="p-1 hover:bg-[#e8e6dc]/40 rounded text-[#87867f] hover:text-[#141413] transition flex items-center gap-1 text-[10px] font-semibold"
+                      >
+                        {isLlmOutputExpanded ? (
+                          <>
+                            <span>收起</span>
+                            <ChevronUp size={12} />
+                          </>
+                        ) : (
+                          <>
+                            <span>展开</span>
+                            <ChevronDown size={12} />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    {isLlmOutputExpanded && (
+                      <pre className="text-[11px] font-mono text-near-black overflow-auto max-h-72 p-3 bg-white rounded border border-border-cream whitespace-pre-wrap break-words leading-relaxed animate-fade-in">
+                        {rawLlmResponse}
+                      </pre>
+                    )}
                   </div>
                 )}
 
@@ -3535,8 +3568,31 @@ export default function DocumentExtractor({ presetId = null }) {
                             <th className="p-3 font-bold text-near-black w-[50px] text-center whitespace-nowrap sticky left-0 top-0 z-40 bg-parchment border-r border-border-cream shadow-[0_1px_0_0_#e8e6dc]">#</th>
                             <th className="p-3 font-bold text-near-black w-[100px] text-left whitespace-nowrap sticky left-[50px] top-0 z-40 bg-parchment border-r-2 border-r-stone-200 shadow-[2px_1px_0_0_#e8e6dc] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">信息来源</th>
                             {fields.map((f, idx) => (
-                              <th key={idx} style={{ width: `${step3FieldWidths[idx]}px` }} className="p-3 font-bold text-near-black truncate sticky top-0 z-30 bg-parchment" title={f.label}>
+                              <th key={idx} style={{ width: `${step3FieldWidths[idx]}px` }} className="p-3 font-bold text-near-black truncate sticky top-0 z-30 bg-parchment relative group" title={f.label}>
                                 {f.label || `列_${idx + 1}`}
+                                <div
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    const startX = e.clientX;
+                                    const startWidth = step3FieldWidths[idx];
+                                    const doDrag = (moveEvent) => {
+                                      const deltaX = moveEvent.clientX - startX;
+                                      const newWidth = Math.max(80, startWidth + deltaX);
+                                      setCustomColWidths(prev => ({
+                                        ...prev,
+                                        [idx]: newWidth
+                                      }));
+                                    };
+                                    const stopDrag = () => {
+                                      document.removeEventListener('mousemove', doDrag);
+                                      document.removeEventListener('mouseup', stopDrag);
+                                    };
+                                    document.addEventListener('mousemove', doDrag);
+                                    document.addEventListener('mouseup', stopDrag);
+                                  }}
+                                  className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize select-none bg-transparent hover:bg-terracotta/40 group-hover:bg-[#e8e6dc]/80 active:bg-terracotta transition-colors"
+                                  style={{ zIndex: 10 }}
+                                />
                               </th>
                             ))}
                             <th className="p-3 font-bold text-near-black text-center whitespace-nowrap sticky right-0 top-0 z-40 bg-parchment border-l border-border-cream shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] w-[80px]">操作</th>

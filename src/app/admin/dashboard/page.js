@@ -35,11 +35,55 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState('');
   const [days, setDays] = useState(7); // default 7 days
 
+  // 新增联动过滤状态与源数据
+  const [selectedDept, setSelectedDept] = useState('all');
+  const [selectedPreset, setSelectedPreset] = useState('all');
+  const [presets, setPresets] = useState([]);
+  const [departments, setDepartments] = useState([]);
+
+  // 动态计算在当前选中部门下可见的预设
+  const visiblePresets = selectedDept === 'all'
+    ? presets
+    : presets.filter(p => p.department === selectedDept);
+
+  // 部门切换处理（联动重置预设）
+  const handleDeptChange = (e) => {
+    const val = e.target.value;
+    setSelectedDept(val);
+    setSelectedPreset('all');
+  };
+
+  // 预设切换处理（联动更新部门）
+  const handlePresetChange = (e) => {
+    const val = e.target.value;
+    setSelectedPreset(val);
+    if (val !== 'all') {
+      const p = presets.find(item => item.id === val);
+      if (p && p.department) {
+        setSelectedDept(p.department);
+      }
+    }
+  };
+
+  // 获取物理预设列表
+  useEffect(() => {
+    fetch('/api/presets')
+      .then(res => res.json())
+      .then(data => {
+        if (data.presets) {
+          setPresets(data.presets);
+          const depts = Array.from(new Set(data.presets.map(p => p.department).filter(Boolean)));
+          setDepartments(depts);
+        }
+      })
+      .catch(err => console.error('获取预设失败:', err));
+  }, []);
+
   const fetchStats = async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/stats/tokens?days=${days}`);
+      const res = await fetch(`/api/stats/tokens?days=${days}&presetId=${selectedPreset}&department=${selectedDept}`);
       const data = await res.json();
       if (res.ok) {
         setStats(data);
@@ -55,7 +99,7 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     fetchStats();
-  }, [days]);
+  }, [days, selectedDept, selectedPreset]);
 
   // 工具函数：数值格式化 (1k, 1M等)
   const formatNumber = (num) => {
@@ -117,7 +161,31 @@ export default function AdminDashboardPage() {
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-serif font-bold text-near-black">模型使用明细</h2>
           <div className="flex items-center gap-2">
-            <Calendar size={16} className="text-stone-400" />
+            {/* 部门筛选 */}
+            <select
+              className="bg-white border border-[#e8e6dc] text-xs font-semibold rounded-lg px-3 py-1.5 outline-none focus:ring-1 focus:ring-terracotta cursor-pointer"
+              value={selectedDept}
+              onChange={handleDeptChange}
+            >
+              <option value="all">全部部门</option>
+              {departments.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
+
+            {/* 预设筛选 */}
+            <select
+              className="bg-white border border-[#e8e6dc] text-xs font-semibold rounded-lg px-3 py-1.5 outline-none focus:ring-1 focus:ring-terracotta cursor-pointer"
+              value={selectedPreset}
+              onChange={handlePresetChange}
+            >
+              <option value="all">全部预设</option>
+              {visiblePresets.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+
+            <Calendar size={16} className="text-stone-400 ml-1" />
             <select
               className="bg-white border border-[#e8e6dc] text-xs font-semibold rounded-lg px-3 py-1.5 outline-none focus:ring-1 focus:ring-terracotta cursor-pointer"
               value={days}

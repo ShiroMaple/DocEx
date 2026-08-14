@@ -9,6 +9,8 @@ export async function GET(request) {
   try {
     const url = new URL(request.url);
     const days = parseInt(url.searchParams.get('days') || '7', 10);
+    const presetIdFilter = url.searchParams.get('presetId');
+    const departmentFilter = url.searchParams.get('department');
     
     // 计算起始时间戳
     const now = new Date();
@@ -62,6 +64,16 @@ export async function GET(request) {
           ) {
             const metrics = logObj.metrics;
             if (!metrics || (!metrics.promptTokens && !metrics.completionTokens)) continue;
+
+            const presetId = logObj.presetId || 'unknown';
+            const department = logObj.department || 'unknown';
+
+            if (presetIdFilter && presetIdFilter !== 'all' && presetId !== presetIdFilter) {
+              continue;
+            }
+            if (departmentFilter && departmentFilter !== 'all' && department !== departmentFilter) {
+              continue;
+            }
 
             const model = logObj.model || 'unknown';
             const pTokens = metrics.promptTokens || 0;

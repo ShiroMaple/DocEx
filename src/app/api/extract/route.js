@@ -89,7 +89,7 @@ function checkPromptSecurity(systemPrompt, userPrompt, fields) {
 async function extractHandler(request) {
   try {
     const jsonBody = await request.json();
-    const { md5, systemPrompt, userPrompt, fields, postFilters } = jsonBody;
+    const { md5, systemPrompt, userPrompt, fields, postFilters, presetId, department } = jsonBody;
     const llmConfig = jsonBody.llmConfig || {};
 
     if (!md5) {
@@ -308,6 +308,8 @@ async function extractHandler(request) {
             logger.info({
               event: 'LLM_EXTRACTION_SUCCESS',
               model: targetLlmConfig.model || diskConfig.defaultLLMConf.model,
+              presetId: presetId || 'unknown',
+              department: department || 'unknown',
               durationMs,
               metrics: {
                 promptTokens: doneResult.usage?.promptTokens,
