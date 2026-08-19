@@ -432,5 +432,250 @@
         "isAdvancedOpen": false
       }
     ]
+  },
+  {
+    "id": "quality_certificate",
+    "name": "材料质保书/质量证明书提取",
+    "description": "用于金属材料、钢管及压力容器构件质保书的物料明细、化学成分、力学性能与各类检测标准结果提取",
+    "fields": [
+      {
+        "key": "inventoryNo",
+        "label": "清单/质保书编号",
+        "desc": "提取文档顶部或表头的清单编号、质保书编号或证书号（如 No. 后的编号），去除“No.”前缀与多余空格。",
+        "example": "20260704203",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "constructionNo",
+        "label": "施工号/工程号",
+        "desc": "提取施工号、工程号、合同号或订单号，保留连字符与字母数字全串。",
+        "example": "26715-7053",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "rawMaterialNo",
+        "label": "原材料自编号",
+        "desc": "提取原材料自编号或内部物料跟踪编号，若无明确记录则填“未提及”。",
+        "example": "ZGR2026-283",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "lotNo",
+        "label": "钢管/产品批号",
+        "desc": "提取表格中每行产品明细的“批号/Lot No.”、“管号”或批次代码。",
+        "example": "Z26022C-DB7",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "heatNo",
+        "label": "熔炼炉号",
+        "desc": "提取熔炼炉号（Heat No.），若表格中炉批合一则提取炉号部分，若未提及填“未提及”。",
+        "example": "H26022",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "material",
+        "label": "材质牌号",
+        "desc": "提取表格明细行的材质/钢种牌号（如 S32168、06Cr18Ni11Ti、316L、304 等）。",
+        "example": "S32168",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "size",
+        "label": "规格尺寸(mm)",
+        "desc": "提取表格明细行的规格型号（外径×壁厚等），保留乘号“×”或“*”，去除单位 mm。",
+        "example": "15×0.8",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "quantity",
+        "label": "支数/数量",
+        "desc": "提取表格明细行的支数或件数，仅保留整数数值。",
+        "example": "320",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "weight",
+        "label": "重量(kg)",
+        "desc": "提取表格明细行的重量数值，去除“kg”等单位符号，保留数值。",
+        "example": "3933.0",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "standard",
+        "label": "执行标准",
+        "desc": "提取技术协议或产品执行制造/检验标准（如 GB/T 13296-2013、GB/T 14976、ASTM A312 等），未提及填“未提及”。",
+        "example": "GB/T 13296-2013",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "deliveryStatus",
+        "label": "交货状态/热处理",
+        "desc": "提取热处理状态（如固溶处理、退火、酸洗及热处理温度和冷却方式），未提及填“未提及”。",
+        "example": "1050℃固溶快冷",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "elemC",
+        "label": "碳 C(%)",
+        "desc": "提取熔炼/成品化学成分分析中碳(C)的实测百分比含量，仅保留数值。",
+        "example": "0.045",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "elemSi",
+        "label": "硅 Si(%)",
+        "desc": "提取化学成分中硅(Si)的实测百分比含量，仅保留数值。",
+        "example": "0.52",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "elemMn",
+        "label": "锰 Mn(%)",
+        "desc": "提取化学成分中锰(Mn)的实测百分比含量，仅保留数值。",
+        "example": "1.28",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "elemP",
+        "label": "磷 P(%)",
+        "desc": "提取化学成分中磷(P)的实测百分比含量，仅保留数值。",
+        "example": "0.028",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "elemS",
+        "label": "硫 S(%)",
+        "desc": "提取化学成分中硫(S)的实测百分比含量，仅保留数值。",
+        "example": "0.005",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "elemNi",
+        "label": "镍 Ni(%)",
+        "desc": "提取化学成分中镍(Ni)的实测百分比含量，仅保留数值。",
+        "example": "9.12",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "elemCr",
+        "label": "铬 Cr(%)",
+        "desc": "提取化学成分中铬(Cr)的实测百分比含量，仅保留数值。",
+        "example": "17.35",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "elemTi",
+        "label": "钛 Ti(%)",
+        "desc": "提取化学成分中钛(Ti)的实测百分比含量，未检测或未提及填“未提及”。",
+        "example": "0.32",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "elemMo",
+        "label": "钼 Mo(%)",
+        "desc": "提取化学成分中钼(Mo)的实测百分比含量，未检测或未提及填“未提及”。",
+        "example": "未提及",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "otherElements",
+        "label": "其他化学成分",
+        "desc": "提取其他未列出的化学成分指标（如 N, Cu, Nb, Al 等），格式为 元素:数值，若无填“无”。",
+        "example": "N:0.02",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "tensileStrength",
+        "label": "抗拉强度 Rm(MPa)",
+        "desc": "提取室温拉伸试验的抗拉强度(Rm)数值，去除单位 MPa，未做填“未提及”。",
+        "example": "560",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "yieldStrength",
+        "label": "屈服强度 Rp0.2(MPa)",
+        "desc": "提取规定非比例延伸强度/屈服强度(Rp0.2)数值，去除单位 MPa，未做填“未提及”。",
+        "example": "235",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "elongation",
+        "label": "断后伸长率 A(%)",
+        "desc": "提取断后伸长率(A/A50)实测数值，去除 % 符号，未做填“未提及”。",
+        "example": "45.0",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "hardness",
+        "label": "硬度试验",
+        "desc": "提取硬度试验实测值（如 165 HBW、82 HRB 等），未做填“未提及”。",
+        "example": "165 HBW",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "flatteningTest",
+        "label": "压扁试验",
+        "desc": "提取压扁试验（Flattening Test）的判定结果及测试说明（如“合格 / 间距H无裂缝”），未做填“未提及”。",
+        "example": "合格",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "flaringTest",
+        "label": "扩口/卷边试验",
+        "desc": "提取扩口或卷边试验（Flaring/Expansion Test）结果（如“合格 / 扩口率20%无裂纹”），未做填“未提及”。",
+        "example": "合格",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "hydraulicTest",
+        "label": "水压/耐压试验",
+        "desc": "提取逐根水压试验或气密试验压力与保压结果（如“合格 (10.5MPa 保压10s)”），未做填“未提及”。",
+        "example": "合格 (10.5MPa)",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "ndtTest",
+        "label": "无损检测(探伤)",
+        "desc": "提取无损探伤（NDT）方法、执行标准与验收结论（如“涡流探伤合格 按GB/T 7735”、“超声波探伤合格”），未做填“未提及”。",
+        "example": "涡流探伤合格",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "intergranularCorrosion",
+        "label": "晶间腐蚀试验",
+        "desc": "提取晶间腐蚀试验执行方法与评定结果（如“合格 按GB/T 4334 E法”或“ASTM A262 Practice E 合格”），未做填“未提及”。",
+        "example": "E法 合格",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "grainSize",
+        "label": "晶粒度/金相组织",
+        "desc": "提取显微金相组织类型及奥氏体晶粒度级别（如“奥氏体组织，晶粒度 7.0 级”），未提及填“未提及”。",
+        "example": "奥氏体组织，晶粒度 7.0 级",
+        "isAdvancedOpen": true
+      },
+      {
+        "key": "inspectionConclusion",
+        "label": "综合检验判定",
+        "desc": "提取质保书最终质量检验判定结论（如“合格”、“准予出厂”、“符合标准要求”）。",
+        "example": "合格",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "issueDate",
+        "label": "签发日期",
+        "desc": "提取质保书出具或签发日期，统一清洗格式化为 YYYY-MM-DD（如 2026-07-27）。",
+        "example": "2026-07-27",
+        "isAdvancedOpen": false
+      },
+      {
+        "key": "manufacturer",
+        "label": "制造厂家/出具单位",
+        "desc": "提取质保书出具单位、制造厂家或印章单位名称，若无明确提及填“质量专用章”。",
+        "example": "质量专用章",
+        "isAdvancedOpen": false
+      }
+    ]
   }
 ]
