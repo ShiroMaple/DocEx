@@ -8,8 +8,6 @@
     "maxRequests": 20
   },
   "paths": {
-    "inputDir": "data/input",
-    "outputDir": "data/output",
     "uploadDir": "data/uploads",
     "preprocessDir": "data/preprocessed",
     "presetsDir": "presets"
@@ -19,8 +17,8 @@
     "maxRetries": 2,
     "configs": [
       {
-        "id": "default",
-        "name": "默认配置",
+        "id": "reco-standard",
+        "name": "标准配置",
         "provider": "Moonshot",
         "baseUrl": "https://api.moonshot.cn/v1",
         "model": "kimi-k2.7-code",
@@ -29,7 +27,7 @@
         "isDefault": true
       },
       {
-        "id": "default-highspeed",
+        "id": "reco-highspeed",
         "name": "高速配置",
         "provider": "Moonshot",
         "baseUrl": "https://api.moonshot.cn/v1",

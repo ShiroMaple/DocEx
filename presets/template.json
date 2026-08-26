@@ -7,6 +7,9 @@
   "department": "所属部门名称 (必填)。作用：显示在顶部 Header 标题下拉切换菜单的大标题中，例如 '安全环保部'、'质量管理部'",
   "subtitle": "预设副标题/描述 (选填)。作用：显示在顶部 Header 切换菜单选项的第二行小字提示中",
   "badgeText": "专属徽标文案 (选填)。作用：显示在专属页面顶部 Header 胶囊按钮中的文案，例如 '🛡️ 安全环保部专用版'",
+  "enabled": "预设总启用开关 (布尔值 true / false，默认 true)。作用：控制预设前台访问与下拉菜单的可见性，停用后隐藏入口且禁止访问 (default 内置预设始终锁定启用)",
+  "llmConfigId": "引用 config.json 中 llm.configs 的模型配置 ID (如 'reco-standard' 或 'reco-highspeed')。作用：指定该预设默认绑定使用的大模型配置",
+  "tableConfigId": "引用 config.json 中 tables.configs 的多维表格配置 ID (如 'wps_test' 或 'wps_hse')。作用：指定该预设默认绑定的多维表格",
 
   "locked": "全局锁定开关 (布尔值 true / false)。作用：简易总开关，当未指定细粒度权限时，true 代表全部锁定",
   "allowAutoDetectFields": "允许使用 AI 自动识别推演提取字段 (布尔值 true / false，默认 false)。作用：若为 false，将隐藏步骤 2 中“🔮 自动识别字段”的 AI 推演分析按钮",

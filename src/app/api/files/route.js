@@ -42,9 +42,9 @@ async function getFilesHandler(request) {
     }
 
     const db = await readDb();
-    // 仅过滤出包含当前 presetId 标签的文件，并按上传时间倒序返回
+    // 仅过滤出包含当前 presetId 标签且有效就绪的文件，并按上传时间倒序返回
     const files = (db.files || [])
-      .filter(f => Array.isArray(f.presets) && f.presets.includes(presetId))
+      .filter(f => Boolean(f.fileName) && f.status !== 'failed' && Array.isArray(f.presets) && f.presets.includes(presetId))
       .sort((a, b) => new Date(b.uploadTime) - new Date(a.uploadTime));
 
     return NextResponse.json({

@@ -30,7 +30,7 @@ import {
  */
 export const GET = withLogging(async (request) => {
   const presets = getAllRawPresets();
-  const { fieldsGroups, tableConfigs } = getPresetAuxiliaryData();
+  const { fieldsGroups, tableConfigs, llmConfigs } = getPresetAuxiliaryData();
 
   logger.info({
     event: 'ADMIN_PRESETS_FETCHED',
@@ -42,7 +42,8 @@ export const GET = withLogging(async (request) => {
     success: true,
     presets,
     fieldsGroups,
-    tableConfigs
+    tableConfigs,
+    llmConfigs
   });
 });
 
@@ -163,8 +164,13 @@ export const PUT = withLogging(async (request) => {
     operator: 'Admin',
     presetId: id,
     presetName: saved.name,
-    department: saved.department
-  }, `📝 管理员更新预设配置成功: [${id}] ${saved.name}`);
+    department: saved.department,
+    enabled: saved.enabled !== false,
+    llmConfigId: saved.llmConfigId || '',
+    tableConfigId: saved.tableConfigId || '',
+    allowViewCachedFiles: Boolean(saved.allowViewCachedFiles),
+    cacheRetentionDays: saved.cacheRetentionDays
+  }, `📝 管理员更新预设配置成功: [${id}] ${saved.name} (enabled: ${saved.enabled !== false})`);
 
   return NextResponse.json({
     success: true,

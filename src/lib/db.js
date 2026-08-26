@@ -18,6 +18,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logger } from './logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -75,7 +76,7 @@ function _normalizeFile(file) {
   const uploadTime = file.uploadTime || new Date().toISOString();
   let presetMap = file.presetMap;
 
-  if (presetMap === undefined || presetMap === null || typeof presetMap !== 'object') {
+  if (!presetMap || typeof presetMap !== 'object' || Object.keys(presetMap).length === 0) {
     presetMap = {};
     if (Array.isArray(file.presets) && file.presets.length > 0) {
       file.presets.forEach(p => {
@@ -269,7 +270,12 @@ export async function runTtlCleanup(presetRetentionDaysMap = {}) {
 
       if (remainingPresets.length === 0) {
         // 无任何有效预设引用，执行物理删除
-        console.log(`🧹 TTL Cleanup: 文件 ${normalized.fileName} (${normalized.md5}) 失去所有预设有效引用，彻底物理清理中...`);
+        logger.info({
+          event: 'TTL_DOCUMENT_PURGED',
+          md5: normalized.md5,
+          fileName: normalized.fileName
+        }, `🧹 TTL 清理任务：文档 [${normalized.fileName}] (${normalized.md5}) 失去所有预设引用，已彻底物理清理`);
+
         if (normalized.originalPath) {
           await fs.unlink(normalized.originalPath).catch(() => {});
         }

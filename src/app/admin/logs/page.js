@@ -38,7 +38,8 @@ import {
   Layers,
   Database,
   BarChart2,
-  Sliders
+  Sliders,
+  ArrowUpRight
 } from 'lucide-react';
 
 // 轻量 JSON 语法高亮器
@@ -199,21 +200,21 @@ export default function AdminLogsPage() {
       {/* 顶部导航与 Header */}
       <header className="border-b border-[#e8e6dc] bg-[#faf9f5] px-8 py-5 shadow-sm sticky top-0 z-30">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
+          <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2.5">
-              <span className="p-1.5 bg-terracotta text-white rounded-lg">
+              <span className="p-1.5 bg-terracotta text-white rounded-lg shadow-2xs">
                 <Terminal size={18} />
               </span>
               <h1 className="text-xl font-bold font-serif text-[#141413]">日志与业务审计终端</h1>
             </div>
             
             {/* Admin 统一导航 Tab */}
-            <div className="flex items-center gap-1 bg-[#e8e6dc]/50 p-1 rounded-lg w-fit mt-3">
+            <div className="flex items-center gap-1 bg-[#e8e6dc]/50 p-1 rounded-lg w-fit">
               <Link href="/admin/logs" className={`px-4 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${pathname === '/admin/logs' ? 'bg-white shadow-sm text-near-black' : 'text-stone-500 hover:text-near-black'}`}>
                 <Terminal size={14} /> 操作日志
               </Link>
               <Link href="/admin/dashboard" className={`px-4 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${pathname === '/admin/dashboard' ? 'bg-white shadow-sm text-near-black' : 'text-stone-500 hover:text-near-black'}`}>
-                <BarChart2 size={14} /> 统计大盘
+                <BarChart2 size={14} /> 统计看板
               </Link>
               <Link href="/admin/panel" className={`px-4 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${pathname === '/admin/panel' ? 'bg-white shadow-sm text-near-black' : 'text-stone-500 hover:text-near-black'}`}>
                 <Sliders size={14} /> 控制面板
@@ -221,7 +222,7 @@ export default function AdminLogsPage() {
             </div>
           </div>
 
-          {/* 指标卡板 */}
+          {/* 右侧：指标卡板与返回主页 */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="bg-[#f5f4ed] border border-[#e8e6dc] px-4 py-2 rounded-xl text-left shadow-inner flex items-center gap-3">
               <Activity className="text-terracotta" size={16} />
@@ -244,6 +245,12 @@ export default function AdminLogsPage() {
                 <div className="text-sm font-bold font-mono text-[#3898ec]">{stats.auditCount} 笔</div>
               </div>
             </div>
+            <Link
+              href="/"
+              className="px-4 py-2 text-xs bg-white border border-[#e8e6dc] rounded-xl hover:bg-[#e8e6dc]/40 text-near-black font-semibold flex items-center gap-1.5 transition shadow-2xs"
+            >
+              返回前台主页 <ArrowUpRight size={14} />
+            </Link>
           </div>
         </div>
       </header>

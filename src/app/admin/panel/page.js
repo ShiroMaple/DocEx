@@ -37,6 +37,7 @@ export default function AdminControlPanelPage() {
   const [presets, setPresets] = useState([]);
   const [fieldsGroups, setFieldsGroups] = useState([]);
   const [tableConfigs, setTableConfigs] = useState([]);
+  const [llmConfigs, setLlmConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -81,6 +82,7 @@ export default function AdminControlPanelPage() {
         setPresets(data.presets || []);
         setFieldsGroups(data.fieldsGroups || []);
         setTableConfigs(data.tableConfigs || []);
+        setLlmConfigs(data.llmConfigs || []);
 
         const targetId = preferredSelectId || selectedId;
         const matched = (data.presets || []).find(p => p.id === targetId) || data.presets[0];
@@ -98,6 +100,53 @@ export default function AdminControlPanelPage() {
       setError(err.message || '网络请求异常');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 左侧卡片一键快速启用/停用预设
+  const handleQuickToggleEnabled = async (item, e) => {
+    e.stopPropagation();
+    if (item.id === 'default') {
+      showToast('内置通用版预设受系统保护，不可停用', 'info');
+      return;
+    }
+
+    const nextEnabled = item.enabled === false ? true : false;
+    const updatedItem = { ...item, enabled: nextEnabled };
+
+    // 本地乐观更新
+    setPresets(prev => prev.map(p => p.id === item.id ? { ...p, enabled: nextEnabled } : p));
+    if (selectedId === item.id) {
+      setCurrentPreset(prev => prev ? { ...prev, enabled: nextEnabled } : prev);
+      setOriginalPreset(prev => prev ? { ...prev, enabled: nextEnabled } : prev);
+      if (viewMode === 'json') {
+        try {
+          const parsed = JSON.parse(jsonText);
+          parsed.enabled = nextEnabled;
+          setJsonText(JSON.stringify(parsed, null, 2));
+        } catch {}
+      }
+    }
+
+    try {
+      const res = await fetch('/api/admin/presets', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: item.id,
+          presetData: updatedItem
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(`已${nextEnabled ? '启用' : '停用'}预设 [${item.name || item.id}]`);
+      } else {
+        throw new Error(data.error || '更新状态失败');
+      }
+    } catch (err) {
+      // 失败回滚
+      setPresets(prev => prev.map(p => p.id === item.id ? { ...p, enabled: !nextEnabled } : p));
+      showToast(`切换失败: ${err.message}`, 'error');
     }
   };
 
@@ -316,61 +365,61 @@ export default function AdminControlPanelPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f4ed] text-[#141413] selection:bg-[#e8e6dc] selection:text-[#141413] font-sans pb-16">
-      {/* 顶部 Header 与 Admin 导航 Tab */}
-      <header className="border-b border-[#e8e6dc] bg-[#faf9f5] px-6 md:px-8 py-4 shadow-sm sticky top-0 z-30">
+      {/* 顶部 Header 与 Admin 统一导航 Tab */}
+      <header className="border-b border-[#e8e6dc] bg-[#faf9f5] px-8 py-5 shadow-sm sticky top-0 z-30">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex flex-col gap-2.5">
+          <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2.5">
-              <span className="p-1.5 bg-[#c96442] text-white rounded-lg shadow-sm">
+              <span className="p-1.5 bg-terracotta text-white rounded-lg shadow-2xs">
                 <Sliders size={18} />
               </span>
               <h1 className="text-xl font-bold font-serif text-[#141413]">系统管理控制台</h1>
-              <span className="text-xs bg-[#e8e6dc] text-[#5e5d59] px-2 py-0.5 rounded-full font-mono">Control Panel</span>
+              <span className="text-[11px] bg-[#e8e6dc]/80 text-[#5e5d59] px-2 py-0.5 rounded-full font-mono">Control Panel</span>
             </div>
 
             {/* Admin 统一导航 Tab */}
-            <div className="flex items-center gap-1 bg-[#e8e6dc]/60 p-1 rounded-lg w-fit">
+            <div className="flex items-center gap-1 bg-[#e8e6dc]/50 p-1 rounded-lg w-fit">
               <Link
                 href="/admin/logs"
-                className={`px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${pathname === '/admin/logs' ? 'bg-white shadow-sm text-[#141413]' : 'text-[#87867f] hover:text-[#141413]'}`}
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${pathname === '/admin/logs' ? 'bg-white shadow-sm text-near-black' : 'text-stone-500 hover:text-near-black'}`}
               >
                 <Terminal size={14} /> 操作日志
               </Link>
               <Link
                 href="/admin/dashboard"
-                className={`px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${pathname === '/admin/dashboard' ? 'bg-white shadow-sm text-[#141413]' : 'text-[#87867f] hover:text-[#141413]'}`}
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${pathname === '/admin/dashboard' ? 'bg-white shadow-sm text-near-black' : 'text-stone-500 hover:text-near-black'}`}
               >
                 <BarChart2 size={14} /> 统计看板
               </Link>
               <Link
                 href="/admin/panel"
-                className={`px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${pathname === '/admin/panel' ? 'bg-white shadow-sm text-[#141413]' : 'text-[#87867f] hover:text-[#141413]'}`}
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${pathname === '/admin/panel' ? 'bg-white shadow-sm text-near-black' : 'text-stone-500 hover:text-near-black'}`}
               >
                 <Sliders size={14} /> 控制面板
               </Link>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => fetchPresetsData()}
-              className="px-3 py-1.5 text-xs bg-white border border-[#e8e6dc] rounded-lg hover:bg-[#e8e6dc]/30 text-[#5e5d59] flex items-center gap-1.5 transition"
+              className="px-3.5 py-2 text-xs bg-white border border-[#e8e6dc] rounded-xl hover:bg-[#e8e6dc]/30 text-stone-600 flex items-center gap-1.5 transition shadow-2xs font-medium"
               title="重新加载物理配置"
             >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> 刷新
+              <RefreshCw size={13} className={loading ? 'animate-spin text-terracotta' : ''} /> 刷新配置
             </button>
             <Link
               href="/"
-              className="px-3.5 py-1.5 text-xs bg-white border border-[#e8e6dc] rounded-lg hover:bg-[#e8e6dc]/40 text-[#141413] font-medium flex items-center gap-1 transition shadow-2xs"
+              className="px-4 py-2 text-xs bg-white border border-[#e8e6dc] rounded-xl hover:bg-[#e8e6dc]/40 text-near-black font-semibold flex items-center gap-1.5 transition shadow-2xs"
             >
-              返回前台主页 <ArrowUpRight size={13} />
+              返回前台主页 <ArrowUpRight size={14} />
             </Link>
           </div>
         </div>
       </header>
 
       {/* 主工作区 */}
-      <main className="max-w-7xl mx-auto px-4 md:px-8 mt-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-6 sm:mt-8">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center gap-2 text-sm shadow-sm">
             <AlertCircle size={18} />
@@ -418,31 +467,72 @@ export default function AdminControlPanelPage() {
               ) : (
                 filteredPresets.map((item) => {
                   const isSelected = item.id === selectedId;
+                  const isEnabled = item.enabled !== false;
+                  const isBuiltin = item.id === 'default';
+
                   return (
-                    <button
+                    <div
                       key={item.id}
                       onClick={() => handleSelectPreset(item)}
-                      className={`text-left p-3 rounded-xl border transition-all relative flex flex-col gap-1.5 ${
+                      className={`text-left p-3 rounded-xl border transition-all relative flex flex-col gap-2 cursor-pointer select-none ${
                         isSelected
                           ? 'bg-white border-[#c96442] shadow-sm ring-1 ring-[#c96442]'
-                          : 'bg-white/60 hover:bg-white border-[#e8e6dc] text-[#5e5d59]'
+                          : isEnabled
+                            ? 'bg-white/60 hover:bg-white border-[#e8e6dc] text-[#5e5d59] hover:shadow-xs'
+                            : 'bg-[#faf9f5]/50 hover:bg-[#faf9f5] border-[#e8e6dc]/80 text-[#87867f] opacity-75'
                       }`}
                     >
+                      {/* 顶行：左侧[图标 + 预设名称]，右侧[Mini Switch 或 内置徽章] */}
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                           <span className="text-base flex-shrink-0">{item.icon && !item.icon.startsWith('/') ? item.icon : '📜'}</span>
-                          <span className="font-semibold text-xs text-[#141413] truncate">{item.name || item.id}</span>
+                          <span className={`font-semibold text-xs truncate ${isEnabled ? 'text-[#141413]' : 'text-[#87867f] line-through decoration-[#87867f]/40'}`}>
+                            {item.name || item.id}
+                          </span>
                         </div>
-                        {item.id === 'default' && (
-                          <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-mono flex-shrink-0">内置</span>
-                        )}
+
+                        {/* 状态控制区 */}
+                        <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                          {isBuiltin ? (
+                            <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-1.5 py-0.5 rounded-full font-medium flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 内置
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => handleQuickToggleEnabled(item, e)}
+                              title={isEnabled ? '点击停用预设（停用后前台隐藏入口）' : '点击启用预设'}
+                              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-hidden ${
+                                isEnabled ? 'bg-[#c96442]' : 'bg-[#d8d6ce]'
+                              }`}
+                            >
+                              <span
+                                className={`inline-block h-3 w-3 transform rounded-full bg-white shadow-xs transition-transform ${
+                                  isEnabled ? 'translate-x-3.5' : 'translate-x-0.5'
+                                }`}
+                              />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="flex items-center justify-between text-[11px] text-[#87867f] pt-0.5">
-                        <span className="bg-[#e8e6dc]/60 px-1.5 py-0.5 rounded text-[#5e5d59]">{item.department || '未分配部门'}</span>
-                        <span className="font-mono text-[10px] text-[#87867f]">{item.id}</span>
+                      {/* 底行：左侧[部门徽章 + 停用标识]，右侧[预设 ID] */}
+                      <div className="flex items-center justify-between gap-2 text-[11px] pt-1 border-t border-[#f0eee6]/80">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="bg-[#e8e6dc]/60 text-[#5e5d59] px-1.5 py-0.5 rounded text-[10px] truncate max-w-[110px]">
+                            {item.department || '未分配部门'}
+                          </span>
+                          {!isEnabled && (
+                            <span className="text-[10px] bg-red-50 text-red-600 border border-red-200/60 px-1.5 py-0.2 rounded font-medium flex-shrink-0">
+                              已停用
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-mono text-[10px] text-[#87867f] flex-shrink-0 text-right">
+                          {item.id}
+                        </span>
                       </div>
-                    </button>
+                    </div>
                   );
                 })
               )}
@@ -598,53 +688,91 @@ export default function AdminControlPanelPage() {
                       </div>
                     </div>
 
-                    {/* 模块 2：关联设置 (Fields & Tables) */}
-                    <div className="bg-white border border-[#e8e6dc] rounded-xl p-4 flex flex-col gap-4 shadow-2xs">
+                    {/* 模块 2：关联设置 (LLM, Fields & Tables) */}
+                    <div className="bg-white border border-[#e8e6dc] rounded-xl p-4 flex flex-col gap-3.5 shadow-2xs">
                       <div className="flex items-center gap-2 border-b border-[#f0eee6] pb-2 text-xs font-bold text-[#141413]">
-                        <Database size={14} className="text-[#c96442]" /> 关联字段库与多维数据表
+                        <Database size={14} className="text-[#c96442]" /> 关联模型、字段库与多维数据表
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-medium text-[#5e5d59] mb-1 flex items-center justify-between">
-                            <span>关联抽取字段组 (fieldsRef)</span>
-                            <span className="text-[10px] text-[#87867f]">引用 fields.json</span>
-                          </label>
-                          <select
-                            value={currentPreset.fieldsRef || 'default'}
-                            onChange={(e) => handleFieldChange('fieldsRef', e.target.value)}
-                            className="w-full px-3 py-1.5 text-xs bg-[#faf9f5] border border-[#e8e6dc] rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#3898ec] text-[#141413]"
-                          >
-                            {fieldsGroups.map(fg => (
-                              <option key={fg.id} value={fg.id}>
-                                {fg.name} ({fg.id}) - 共 {fg.fieldCount} 个字段
-                              </option>
-                            ))}
-                          </select>
-                          <p className="mt-1 text-[11px] text-[#87867f]">
-                            决定该预设默认加载的提取 Schema 与字段列表
-                          </p>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
+                        {/* 关联大模型 */}
+                        <div className="bg-[#faf9f5]/70 border border-[#e8e6dc] rounded-xl p-3 flex flex-col justify-between gap-2.5">
+                          <div>
+                            <div className="flex items-center justify-between gap-1 mb-1">
+                              <span className="text-xs font-semibold text-[#141413]">关联默认大模型</span>
+                              <span className="text-[10px] bg-[#e8e6dc]/80 text-[#5e5d59] px-1.5 py-0.5 rounded font-mono flex-shrink-0">config.json</span>
+                            </div>
+                            <p className="text-[11px] text-[#87867f] leading-tight">
+                              绑定默认调用的供应商、模型及推理强度
+                            </p>
+                          </div>
+                          <div>
+                            <select
+                              value={currentPreset.llmConfigId || ''}
+                              onChange={(e) => handleFieldChange('llmConfigId', e.target.value)}
+                              className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#e8e6dc] rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#3898ec] text-[#141413] shadow-2xs truncate"
+                            >
+                              <option value="">-- 使用系统默认模型配置 --</option>
+                              {llmConfigs.map(lc => (
+                                <option key={lc.id} value={lc.id}>
+                                  [{lc.provider.toUpperCase()}] {lc.name} ({lc.id}) {lc.isDefault ? ' (默认)' : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
 
-                        <div>
-                          <label className="block text-xs font-medium text-[#5e5d59] mb-1 flex items-center justify-between">
-                            <span>关联默认多维表格 (tableConfigId)</span>
-                            <span className="text-[10px] text-[#87867f]">引用 config.json</span>
-                          </label>
-                          <select
-                            value={currentPreset.tableConfigId || ''}
-                            onChange={(e) => handleFieldChange('tableConfigId', e.target.value)}
-                            className="w-full px-3 py-1.5 text-xs bg-[#faf9f5] border border-[#e8e6dc] rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#3898ec] text-[#141413]"
-                          >
-                            <option value="">-- 使用系统默认表格配置 --</option>
-                            {tableConfigs.map(tc => (
-                              <option key={tc.id} value={tc.id}>
-                                [{tc.platform.toUpperCase()}] {tc.name} ({tc.id})
-                              </option>
-                            ))}
-                          </select>
-                          <p className="mt-1 text-[11px] text-[#87867f]">
-                            步骤 4 推送目标多维表对应的后端预设凭证
-                          </p>
+                        {/* 关联字段组 */}
+                        <div className="bg-[#faf9f5]/70 border border-[#e8e6dc] rounded-xl p-3 flex flex-col justify-between gap-2.5">
+                          <div>
+                            <div className="flex items-center justify-between gap-1 mb-1">
+                              <span className="text-xs font-semibold text-[#141413]">关联抽取字段组</span>
+                              <span className="text-[10px] bg-[#e8e6dc]/80 text-[#5e5d59] px-1.5 py-0.5 rounded font-mono flex-shrink-0">fields.json</span>
+                            </div>
+                            <p className="text-[11px] text-[#87867f] leading-tight">
+                              指定预设默认加载的提取字段定义
+                            </p>
+                          </div>
+                          <div>
+                            <select
+                              value={currentPreset.fieldsRef || 'default'}
+                              onChange={(e) => handleFieldChange('fieldsRef', e.target.value)}
+                              className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#e8e6dc] rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#3898ec] text-[#141413] shadow-2xs truncate"
+                            >
+                              {fieldsGroups.map(fg => (
+                                <option key={fg.id} value={fg.id}>
+                                  {fg.name} ({fg.id}) - 共 {fg.fieldCount} 个字段
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* 关联多维表格 */}
+                        <div className="bg-[#faf9f5]/70 border border-[#e8e6dc] rounded-xl p-3 flex flex-col justify-between gap-2.5">
+                          <div>
+                            <div className="flex items-center justify-between gap-1 mb-1">
+                              <span className="text-xs font-semibold text-[#141413]">关联默认多维表格</span>
+                              <span className="text-[10px] bg-[#e8e6dc]/80 text-[#5e5d59] px-1.5 py-0.5 rounded font-mono flex-shrink-0">config.json</span>
+                            </div>
+                            <p className="text-[11px] text-[#87867f] leading-tight">
+                              步骤 4 结构化结果推送的目标多维表凭证
+                            </p>
+                          </div>
+                          <div>
+                            <select
+                              value={currentPreset.tableConfigId || ''}
+                              onChange={(e) => handleFieldChange('tableConfigId', e.target.value)}
+                              className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#e8e6dc] rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#3898ec] text-[#141413] shadow-2xs truncate"
+                            >
+                              <option value="">-- 使用系统默认表格配置 --</option>
+                              {tableConfigs.map(tc => (
+                                <option key={tc.id} value={tc.id}>
+                                  [{tc.platform.toUpperCase()}] {tc.name} ({tc.id})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -656,6 +784,31 @@ export default function AdminControlPanelPage() {
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                        <label className={`flex items-center justify-between p-2.5 rounded-lg border border-[#e8e6dc] transition ${
+                          currentPreset.id === 'default'
+                            ? 'bg-[#faf9f5]/30 cursor-not-allowed opacity-80'
+                            : 'bg-[#faf9f5]/50 hover:bg-[#faf9f5] cursor-pointer'
+                        }`}>
+                          <div>
+                            <div className="text-xs font-semibold text-[#141413] flex items-center gap-1.5">
+                              <span>预设总启用状态 (enabled)</span>
+                              {currentPreset.id === 'default' && (
+                                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1 rounded font-normal">内置永久启用</span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-[#87867f]">
+                              {currentPreset.id === 'default' ? '内置通用版受系统保护，始终保持启用' : '控制前台访问入口与下拉菜单展示'}
+                            </div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={currentPreset.id === 'default' ? true : (currentPreset.enabled !== false)}
+                            disabled={currentPreset.id === 'default'}
+                            onChange={(e) => handleFieldChange('enabled', e.target.checked)}
+                            className="w-4 h-4 text-[#c96442] rounded border-[#e8e6dc] focus:ring-[#c96442] disabled:opacity-50"
+                          />
+                        </label>
+
                         <label className="flex items-center justify-between p-2.5 rounded-lg border border-[#e8e6dc] bg-[#faf9f5]/50 hover:bg-[#faf9f5] cursor-pointer transition">
                           <div>
                             <div className="text-xs font-semibold text-[#141413]">全局锁定 (locked)</div>

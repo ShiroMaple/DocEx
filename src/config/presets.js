@@ -70,15 +70,20 @@ export function getResolvedPreset(id) {
 
   const prefix = targetId.toUpperCase();
 
-  // 读取与合并大模型 API 凭证 (格式如 HSE_OPENAI_API_KEY，无配置则自动回退至通用凭证)
-  const provider = config.getEnv(`${prefix}_LLM_PROVIDER`, config.llmProvider || 'openai');
+  // 1. 优先按 rawPreset.llmConfigId (如 reco-standard) 查找 config.json 中的模型配置
+  const targetLLMConfigId = rawPreset.llmConfigId || '';
+  const matchedLLMConfig = (config.defaultLLMList || []).find(c => targetLLMConfigId && c.id === targetLLMConfigId) || config.defaultLLMConf;
+
+  // 读取与合并大模型 API 凭证 (格式如 HSE_OPENAI_API_KEY，无环境变量配置则使用绑定的模型配置或默认凭证)
+  const provider = config.getEnv(`${prefix}_LLM_PROVIDER`, matchedLLMConfig?.provider || config.llmProvider || 'openai');
   const openai = {
-    apiKey: config.getEnv(`${prefix}_OPENAI_API_KEY`, config.openai.apiKey || ''),
-    baseUrl: config.getEnv(`${prefix}_OPENAI_BASE_URL`, config.openai.baseUrl || 'https://api.openai.com/v1'),
-    model: config.getEnv(`${prefix}_OPENAI_MODEL`, config.openai.model || 'gpt-4o-mini')
+    apiKey: config.getEnv(`${prefix}_OPENAI_API_KEY`, matchedLLMConfig?.apiKey || config.openai.apiKey || ''),
+    baseUrl: config.getEnv(`${prefix}_OPENAI_BASE_URL`, matchedLLMConfig?.baseUrl || config.openai.baseUrl || 'https://api.openai.com/v1'),
+    model: config.getEnv(`${prefix}_OPENAI_MODEL`, matchedLLMConfig?.model || config.openai.model || 'kimi-k2.7-code'),
+    thinkingEffort: matchedLLMConfig?.thinkingEffort || config.defaultLLMConf?.thinkingEffort || 'low'
   };
 
-  // 优先按 rawPreset.tableConfigId (如 wps_hse) 查找 config.json 中的表格配置
+  // 2. 优先按 rawPreset.tableConfigId (如 wps_hse) 查找 config.json 中的表格配置
   const targetTableConfigId = rawPreset.tableConfigId || '';
   const matchedTableConfig = (config.parsedTableConfigs || []).find(c => 
     (targetTableConfigId && c.id === targetTableConfigId) || 
@@ -125,25 +130,30 @@ export function getResolvedPreset(id) {
     if (fs.existsSync(fieldsJsonPath)) {
       const fieldsRaw = fs.readFileSync(fieldsJsonPath, 'utf-8');
       const fieldsData = JSON.parse(fieldsRaw);
-      availableFieldsList = fieldsData.map(group => ({
-        id: group.id,
-        name: group.name,
-        description: group.description,
-        fields: group.fields
-      }));
 
-      const targetRef = rawPreset.fieldsRef || 'default';
-      const matchedGroup = fieldsData.find(group => group.id === targetRef);
-      if (matchedGroup) {
-        resolvedFields = matchedGroup.fields;
+      if (Array.isArray(fieldsData)) {
+        availableFieldsList = fieldsData.map(group => ({
+          id: group.id,
+          name: group.name,
+          description: group.description || '',
+          fieldCount: Array.isArray(group.fields) ? group.fields.length : 0
+        }));
+
+        const refKey = rawPreset.fieldsRef || targetId;
+        const matchedGroup = fieldsData.find(g => g.id === refKey) || fieldsData.find(g => g.id === 'default');
+        if (matchedGroup && Array.isArray(matchedGroup.fields)) {
+          resolvedFields = matchedGroup.fields;
+        }
       }
     }
   } catch (e) {
-    console.error('读取 fields.json 失败:', e);
+    console.error('加载 fields.json 失败:', e);
   }
 
   return {
     ...rawPreset,
+    enabled: targetId === 'default' ? true : (rawPreset.enabled !== false),
+    llmConfigId: targetLLMConfigId,
     fields: resolvedFields,
     availableFieldsList,
     llmProvider: provider,
@@ -155,7 +165,7 @@ export function getResolvedPreset(id) {
 }
 
 /**
- * 获取物理 presets/ 目录下所有已注册的预设摘要列表（用于界面版本切换下拉菜单动态渲染）
+ * 获取物理 presets/ 目录下所有已注册的预设摘要列表（用于界面版本切换下拉菜单动态渲染，仅返回启用状态的预设）
  */
 export function getAllPresetsList() {
   ensurePresetsDir();
@@ -167,7 +177,8 @@ export function getAllPresetsList() {
       if (file.endsWith('.json') && !file.startsWith('template')) {
         const id = path.basename(file, '.json');
         const raw = loadRawPresetFromDisk(id);
-        if (raw) {
+        // 仅包含 enabled 不为 false 的预设（default 始终开启）
+        if (raw && (id === 'default' || raw.enabled !== false)) {
           list.push({
             id: raw.id || id,
             name: raw.name || `${id} 预设`,
@@ -201,6 +212,8 @@ export function getSafePresetForClient(id) {
     subtitle: resolved.subtitle,
     badgeText: resolved.badgeText,
     icon: resolved.icon || (resolved.id === 'default' ? '🌐' : '⚙️'),
+    enabled: resolved.enabled !== false,
+    llmConfigId: resolved.llmConfigId || '',
     tableConfigId: resolved.tableConfigId || '',
     locked: resolved.locked,
     allowAutoDetectFields: Boolean(resolved.allowAutoDetectFields),
@@ -222,6 +235,7 @@ export function getSafePresetForClient(id) {
       provider: resolved.llmProvider,
       baseUrl: resolved.openai.baseUrl,
       model: resolved.openai.model,
+      thinkingEffort: resolved.openai.thinkingEffort || 'low',
       hasApiKey: Boolean(resolved.openai.apiKey)
     },
     wps: resolved.wps ? {
@@ -396,9 +410,25 @@ export function getPresetAuxiliaryData() {
     console.error('读取 tableConfigs 失败:', e);
   }
 
+  let llmConfigs = [];
+  try {
+    const rawLlmList = config.defaultLLMList || [];
+    llmConfigs = rawLlmList.map(c => ({
+      id: c.id,
+      name: c.name || c.id,
+      provider: c.provider || 'openai',
+      model: c.model || '',
+      thinkingEffort: c.thinkingEffort || 'low',
+      isDefault: Boolean(c.isDefault)
+    }));
+  } catch (e) {
+    console.error('读取 llmConfigs 失败:', e);
+  }
+
   return {
     fieldsGroups,
-    tableConfigs
+    tableConfigs,
+    llmConfigs
   };
 }
 

@@ -411,9 +411,11 @@ export default function DocumentExtractor({ presetId = null }) {
               setLlmConnected(true);
             }
             // 联动大模型下拉框当前生效 ID，防止 UI 不同步
-            const match = configList.find(c => c.model === p.llmConfig.model && c.baseUrl === p.llmConfig.baseUrl);
+            const match = (p.llmConfigId && configList.find(c => c.id === p.llmConfigId)) || configList.find(c => c.model === p.llmConfig.model && c.baseUrl === p.llmConfig.baseUrl);
             if (match) {
               setSelectedConfigId(match.id);
+            } else if (p.llmConfigId) {
+              setSelectedConfigId(p.llmConfigId);
             }
           }
 
@@ -492,11 +494,14 @@ export default function DocumentExtractor({ presetId = null }) {
 
         // 优先匹配当前 preset 锁定的模型，防止竞态条件干扰
         let activeConfig = null;
-        if (preset && preset.llmConfig) {
+        if (preset && preset.llmConfigId) {
+          activeConfig = loadedList.find(c => c.id === preset.llmConfigId);
+        }
+        if (!activeConfig && preset && preset.llmConfig) {
           activeConfig = loadedList.find(c => c.model === preset.llmConfig.model && c.baseUrl === preset.llmConfig.baseUrl);
         }
         if (!activeConfig) {
-          const activeId = localStorage.getItem('docex_active_llm_config_id') || 'default';
+          const activeId = localStorage.getItem('docex_active_llm_config_id') || 'reco-standard';
           activeConfig = loadedList.find(c => c.id === activeId) || loadedList.find(c => c.isDefault) || loadedList[0] || defaultLLMConf;
         }
 
@@ -2707,40 +2712,71 @@ export default function DocumentExtractor({ presetId = null }) {
                   accept=".pdf,.docx,.jpg,.jpeg,.png"
                   onChange={(e) => handleFilesUpload(e.target.files)}
                 />
-                {preset?.allowViewCachedFiles && historyFiles.length > 0 && (
+                {preset?.allowViewCachedFiles && (
                   <div className="mt-6 border-t border-border-cream pt-4">
-                    <h3 className="text-xs font-semibold text-olive-gray mb-3 flex items-center gap-1.5">
-                      <span>📄 历史已缓存文档 (点击复用无需重复上传)</span>
-                    </h3>
-
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                      {historyFiles.map(file => (
-                        <div
-                          key={file.md5}
-                          onClick={() => reuseHistoryFile(file)}
-                          className="flex items-center justify-between p-3 rounded-lg border border-border-cream bg-warm-sand/20 hover:bg-warm-sand/40 cursor-pointer transition"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            {file.fileName.toLowerCase().endsWith('.pdf') ? (
-                              <PdfIcon className="w-5 h-5 flex-shrink-0" />
-                            ) : file.fileName.toLowerCase().endsWith('.docx') ? (
-                              <WordIcon className="w-5 h-5 flex-shrink-0" />
-                            ) : (
-                              <ImageIcon className="w-5 h-5 flex-shrink-0" />
-                            )}
-                            <span className="text-xs font-semibold text-near-black truncate" title={file.fileName}>{file.fileName}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-stone-gray flex-shrink-0">
-                            <button
-                              onClick={(e) => deleteHistoryFile(file.md5, e)}
-                              className="p-1 rounded text-stone-gray hover:text-error-crimson transition"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-xs font-semibold text-olive-gray flex items-center gap-1.5">
+                        <span>📄 历史已缓存文档</span>
+                        <span className="text-[10px] bg-warm-sand/80 text-stone-gray px-1.5 py-0.2 rounded-full font-mono">
+                          {historyFiles.length}
+                        </span>
+                        <span className="text-[11px] text-stone-gray font-normal">
+                          (点击卡片一键复用，无需重复解析)
+                        </span>
+                      </h3>
+                      <button
+                        onClick={() => fetchHistoryFiles()}
+                        className="text-[11px] text-stone-gray hover:text-near-black flex items-center gap-1 transition"
+                        title="刷新历史缓存列表"
+                      >
+                        <RotateCcw size={11} /> 刷新
+                      </button>
                     </div>
+
+                    {historyFiles.length === 0 ? (
+                      <div className="p-6 rounded-xl border border-dashed border-border-cream bg-warm-sand/10 text-center flex flex-col items-center justify-center gap-1">
+                        <span className="text-xs text-stone-gray">
+                          当前预设暂无已缓存文档。上传并解析文档后将在此自动留存（默认保留 {preset?.cacheRetentionDays ?? 7} 天），支持随时一键秒级复用。
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                        {historyFiles.map(file => (
+                          <div
+                            key={file.md5}
+                            onClick={() => reuseHistoryFile(file)}
+                            className="flex items-center justify-between p-3 rounded-lg border border-border-cream bg-warm-sand/20 hover:bg-warm-sand/40 hover:border-terracotta/40 cursor-pointer transition shadow-2xs group"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              {file.fileName.toLowerCase().endsWith('.pdf') ? (
+                                <PdfIcon className="w-5 h-5 flex-shrink-0" />
+                              ) : file.fileName.toLowerCase().endsWith('.docx') ? (
+                                <WordIcon className="w-5 h-5 flex-shrink-0" />
+                              ) : (
+                                <ImageIcon className="w-5 h-5 flex-shrink-0" />
+                              )}
+                              <div className="min-w-0 flex flex-col">
+                                <span className="text-xs font-semibold text-near-black truncate" title={file.fileName}>{file.fileName}</span>
+                                {file.uploadTime && (
+                                  <span className="text-[9px] text-stone-gray font-mono">
+                                    {new Date(file.uploadTime).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 text-stone-gray flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={(e) => deleteHistoryFile(file.md5, e)}
+                                className="p-1 rounded text-stone-gray hover:text-error-crimson opacity-0 group-hover:opacity-100 transition"
+                                title="删除此条历史缓存"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </section>

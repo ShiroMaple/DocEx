@@ -13,7 +13,8 @@ import {
   Layers,
   Calendar,
   AlertTriangle,
-  FileText
+  FileText,
+  ArrowUpRight
 } from 'lucide-react';
 import {
   BarChart,
@@ -116,7 +117,7 @@ export default function AdminDashboardPage() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2.5">
-              <span className="p-1.5 bg-terracotta text-white rounded-lg">
+              <span className="p-1.5 bg-terracotta text-white rounded-lg shadow-2xs">
                 <BarChart2 size={18} />
               </span>
               <h1 className="text-xl font-bold font-serif text-[#141413]">统计与开销看板</h1>
@@ -136,25 +137,33 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* 指标卡板 (Header区域快捷信息) */}
-          {stats && !loading && (
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="bg-[#f5f4ed] border border-[#e8e6dc] px-4 py-2 rounded-xl text-left shadow-inner flex items-center gap-3">
-                <JapaneseYen className="text-terracotta" size={16} />
-                <div>
-                  <div className="text-[10px] text-stone-500 uppercase tracking-wider font-semibold">区间总开销</div>
-                  <div className="text-sm font-bold font-mono">{stats.summary.totalCost.toFixed(2)}</div>
+          {/* 指标卡板 (Header区域快捷信息) 与返回主页 */}
+          <div className="flex flex-wrap items-center gap-3">
+            {stats && !loading && (
+              <>
+                <div className="bg-[#f5f4ed] border border-[#e8e6dc] px-4 py-2 rounded-xl text-left shadow-inner flex items-center gap-3">
+                  <JapaneseYen className="text-terracotta" size={16} />
+                  <div>
+                    <div className="text-[10px] text-stone-500 uppercase tracking-wider font-semibold">区间总开销</div>
+                    <div className="text-sm font-bold font-mono">{stats.summary.totalCost.toFixed(2)}</div>
+                  </div>
                 </div>
-              </div>
-              <div className="bg-[#f5f4ed] border border-[#e8e6dc] px-4 py-2 rounded-xl text-left shadow-inner flex items-center gap-3">
-                <Activity className="text-emerald-600" size={16} />
-                <div>
-                  <div className="text-[10px] text-stone-500 uppercase tracking-wider font-semibold">大模型请求数</div>
-                  <div className="text-sm font-bold font-mono text-emerald-700">{stats.summary.totalRequests} 次</div>
+                <div className="bg-[#f5f4ed] border border-[#e8e6dc] px-4 py-2 rounded-xl text-left shadow-inner flex items-center gap-3">
+                  <Activity className="text-emerald-600" size={16} />
+                  <div>
+                    <div className="text-[10px] text-stone-500 uppercase tracking-wider font-semibold">大模型请求数</div>
+                    <div className="text-sm font-bold font-mono text-emerald-700">{stats.summary.totalRequests} 次</div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
+              </>
+            )}
+            <Link
+              href="/"
+              className="px-4 py-2 text-xs bg-white border border-[#e8e6dc] rounded-xl hover:bg-[#e8e6dc]/40 text-near-black font-semibold flex items-center gap-1.5 transition shadow-2xs"
+            >
+              返回前台主页 <ArrowUpRight size={14} />
+            </Link>
+          </div>
         </div>
       </header>
 
