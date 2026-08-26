@@ -11,6 +11,8 @@
   "locked": "全局锁定开关 (布尔值 true / false)。作用：简易总开关，当未指定细粒度权限时，true 代表全部锁定",
   "allowAutoDetectFields": "允许使用 AI 自动识别推演提取字段 (布尔值 true / false，默认 false)。作用：若为 false，将隐藏步骤 2 中“🔮 自动识别字段”的 AI 推演分析按钮",
   "allowSwitchFields": "允许用户在步骤 2 动态切换字段配置 (布尔值 true / false，默认 false)。作用：若为 true，将在第 2 步左侧展示字段配置切换下拉菜单",
+  "allowViewCachedFiles": "允许查看历史缓存文档 (布尔值 true / false，默认 false)。作用：若为 false，前台上传页面不展示历史缓存列表，但不影响同 MD5 文档复用服务器缓存",
+  "cacheRetentionDays": "历史文档缓存有效期 (数字，单位天，默认 7)。作用：服务器上历史文档缓存保留天数，超时自动清理，0 为不缓存/即用即清",
 
   "allowCustomModel": "允许配置自定义模型 (布尔值 true / false，默认 false)。作用：若为 false，将禁用/锁定顶栏大模型 API Key、BaseUrl、Model 的修改入口",
   "allowCustomPlatform": "允许配置自定义文档平台 (布尔值 true / false，默认 false)。作用：若为 false，将禁用/锁定顶栏 WPS / 飞书链接及凭证的修改入口",

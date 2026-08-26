@@ -37,7 +37,8 @@ import {
   Activity,
   Layers,
   Database,
-  BarChart2
+  BarChart2,
+  Sliders
 } from 'lucide-react';
 
 // 轻量 JSON 语法高亮器
@@ -213,6 +214,9 @@ export default function AdminLogsPage() {
               </Link>
               <Link href="/admin/dashboard" className={`px-4 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${pathname === '/admin/dashboard' ? 'bg-white shadow-sm text-near-black' : 'text-stone-500 hover:text-near-black'}`}>
                 <BarChart2 size={14} /> 统计大盘
+              </Link>
+              <Link href="/admin/panel" className={`px-4 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition ${pathname === '/admin/panel' ? 'bg-white shadow-sm text-near-black' : 'text-stone-500 hover:text-near-black'}`}>
+                <Sliders size={14} /> 控制面板
               </Link>
             </div>
           </div>

@@ -205,6 +205,8 @@ export function getSafePresetForClient(id) {
     locked: resolved.locked,
     allowAutoDetectFields: Boolean(resolved.allowAutoDetectFields),
     allowSwitchFields: Boolean(resolved.allowSwitchFields),
+    allowViewCachedFiles: Boolean(resolved.allowViewCachedFiles),
+    cacheRetentionDays: typeof resolved.cacheRetentionDays === 'number' ? resolved.cacheRetentionDays : (Number(resolved.cacheRetentionDays) || 7),
     availableFieldsList: resolved.availableFieldsList || [],
     allowCustomModel: resolved.allowCustomModel,
     allowCustomPlatform: resolved.allowCustomPlatform,
@@ -239,3 +241,164 @@ export function getSafePresetForClient(id) {
     }
   };
 }
+
+/**
+ * 获取 presets/ 目录下所有完整原始预设对象列表（排除 template.json）
+ * @returns {Array<object>}
+ */
+export function getAllRawPresets() {
+  ensurePresetsDir();
+  const presets = [];
+
+  try {
+    const files = fs.readdirSync(PRESETS_DIR);
+    for (const file of files) {
+      if (file.endsWith('.json') && !file.startsWith('template')) {
+        const id = path.basename(file, '.json');
+        const raw = loadRawPresetFromDisk(id);
+        if (raw) {
+          presets.push({
+            ...raw,
+            id: raw.id || id
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.error('读取原始预设列表失败:', e);
+    throw new Error(`读取预设列表失败: ${e.message}`);
+  }
+
+  return presets;
+}
+
+/**
+ * 保存或更新特定预设至物理磁盘 presets/${id}.json（原子覆写）
+ * @param {string} id 预设标识符
+ * @param {object} presetData 预设完整数据对象
+ */
+export function savePresetToDisk(id, presetData) {
+  if (!id || typeof id !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+    throw new Error('预设 ID 不合法，仅允许英文字母、数字、下划线及中划线');
+  }
+
+  if (!presetData || typeof presetData !== 'object') {
+    throw new Error('预设配置内容必须为合法对象');
+  }
+
+  ensurePresetsDir();
+  const targetPath = path.join(PRESETS_DIR, `${id}.json`);
+  const tmpPath = path.join(PRESETS_DIR, `${id}.json.tmp-${Date.now()}`);
+
+  const formattedData = {
+    ...presetData,
+    id: id // 强制确保内部 id 与文件名一致
+  };
+
+  const jsonString = JSON.stringify(formattedData, null, 2) + '\n';
+
+  try {
+    fs.writeFileSync(tmpPath, jsonString, 'utf-8');
+    
+    // Windows 环境下原子重命名带简单重试
+    let renamed = false;
+    let attempts = 0;
+    while (!renamed && attempts < 5) {
+      try {
+        fs.renameSync(tmpPath, targetPath);
+        renamed = true;
+      } catch (err) {
+        attempts++;
+        if (attempts >= 5) {
+          // 降级使用 copy + unlink
+          fs.copyFileSync(tmpPath, targetPath);
+          try { fs.unlinkSync(tmpPath); } catch (_) {}
+          renamed = true;
+        }
+      }
+    }
+  } catch (e) {
+    try {
+      if (fs.existsSync(tmpPath)) {
+        fs.unlinkSync(tmpPath);
+      }
+    } catch (_) {}
+    throw new Error(`写入预设物理文件失败: ${e.message}`);
+  }
+
+  return formattedData;
+}
+
+/**
+ * 从物理磁盘删除指定预设 presets/${id}.json
+ * @param {string} id 预设标识符
+ */
+export function deletePresetFromDisk(id) {
+  if (!id || typeof id !== 'string') {
+    throw new Error('未指定待删除的预设 ID');
+  }
+
+  // 保护核心内置预设禁止删除
+  if (id === 'default') {
+    throw new Error('系统内置核心预设 [default] 受保护，禁止删除');
+  }
+
+  ensurePresetsDir();
+  const targetPath = path.join(PRESETS_DIR, `${id}.json`);
+
+  if (!fs.existsSync(targetPath)) {
+    throw new Error(`预设文件 [${id}.json] 不存在`);
+  }
+
+  try {
+    fs.unlinkSync(targetPath);
+  } catch (e) {
+    throw new Error(`删除预设文件失败: ${e.message}`);
+  }
+
+  return true;
+}
+
+/**
+ * 获取预设编辑器所需的关联辅助数据（fields.json 分组 + config.json 表格配置）
+ */
+export function getPresetAuxiliaryData() {
+  let fieldsGroups = [];
+  try {
+    const fieldsJsonPath = path.resolve(process.cwd(), 'fields.json');
+    if (fs.existsSync(fieldsJsonPath)) {
+      const fieldsRaw = fs.readFileSync(fieldsJsonPath, 'utf-8');
+      const fieldsData = JSON.parse(fieldsRaw);
+      fieldsGroups = fieldsData.map(group => ({
+        id: group.id,
+        name: group.name,
+        description: group.description || '',
+        fieldCount: Array.isArray(group.fields) ? group.fields.length : 0,
+        fields: group.fields || []
+      }));
+    }
+  } catch (e) {
+    console.error('读取 fields.json 失败:', e);
+  }
+
+  let tableConfigs = [];
+  try {
+    const rawTables = config.parsedTableConfigs || config.tables?.configs || [];
+    tableConfigs = rawTables.map(t => ({
+      id: t.id,
+      name: t.name || t.id,
+      platform: t.platform || 'wps',
+      baseUrl: t.baseUrl || '',
+      tableId: t.tableId || '',
+      isDefault: Boolean(t.isDefault)
+    }));
+  } catch (e) {
+    console.error('读取 tableConfigs 失败:', e);
+  }
+
+  return {
+    fieldsGroups,
+    tableConfigs
+  };
+}
+

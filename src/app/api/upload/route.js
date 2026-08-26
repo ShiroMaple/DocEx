@@ -22,6 +22,7 @@ import { fileURLToPath } from 'url';
 import { calculateMd5, triggerPreprocessing } from '../../../lib/preprocess.js';
 import { getFileRecord, saveFileRecord, runTtlCleanup } from '../../../lib/db.js';
 import { withLogging, logger } from '../../../lib/logger.js';
+import { getAllRawPresets, loadRawPresetFromDisk } from '../../../config/presets.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,17 +31,34 @@ const UPLOAD_DIR = path.resolve(process.cwd(), 'data/uploads');
 
 async function uploadHandler(request) {
   try {
-    // 运行一次 TTL 清理，删除老文件
-    await runTtlCleanup().catch(e => {
+    // 动态获取各预设设定的缓存天数并执行 TTL 清理
+    try {
+      const allPresets = getAllRawPresets();
+      const presetsDaysMap = {};
+      allPresets.forEach(p => {
+        presetsDaysMap[p.id] = typeof p.cacheRetentionDays === 'number' ? p.cacheRetentionDays : (Number(p.cacheRetentionDays) || 7);
+      });
+      await runTtlCleanup(presetsDaysMap);
+    } catch (e) {
       logger.error({ 
         event: 'TTL_CLEANUP_ERROR', 
         error: { message: e.message, stack: e.stack } 
       }, 'TTL cleanup failed');
-    });
+    }
 
     const startTime = Date.now();
     const formData = await request.formData();
     const file = formData.get('file');
+    const presetId = formData.get('presetId') || 'default';
+
+    // 获取当前预设设定的缓存天数 (默认 7 天，0 为不缓存)
+    let cacheRetentionDays = 7;
+    try {
+      const presetConf = loadRawPresetFromDisk(presetId);
+      if (presetConf && presetConf.cacheRetentionDays !== undefined) {
+        cacheRetentionDays = Number(presetConf.cacheRetentionDays);
+      }
+    } catch (_) {}
 
     if (!file) {
       return NextResponse.json({ error: '未上传文件' }, { status: 400 });
@@ -86,6 +104,9 @@ async function uploadHandler(request) {
     }
 
     if (existing && (existing.status !== 'done' || physicalExists)) {
+      // 补充/更新当前 preset 标签关联（若 cacheRetentionDays > 0）
+      const updatedExisting = await saveFileRecord(existing, presetId, cacheRetentionDays);
+
       const durationMs = Date.now() - startTime;
       logger.info({
         event: 'AUDIT_DOCUMENT_UPLOAD',
@@ -93,6 +114,7 @@ async function uploadHandler(request) {
         fileName,
         fileSize: file.size,
         md5,
+        presetId,
         cacheHit: true,
         durationMs
       }, `用户上传了文档 [${fileName}]，大小为 [${(file.size / 1024 / 1024).toFixed(2)} MB]，耗时 [${durationMs}ms] (已复用历史预处理缓存)`);
@@ -100,12 +122,13 @@ async function uploadHandler(request) {
       logger.info({
         event: 'PREPROCESS_CACHE_HIT',
         file: { md5, ext },
+        presetId,
         status: existing.status
       }, `🎯 [MD5: ${md5}] 文件已存在且已被预处理，直接复用记录。`);
       return NextResponse.json({ 
         success: true, 
         isDuplicate: true, 
-        record: existing 
+        record: updatedExisting 
       });
     }
 
@@ -114,7 +137,7 @@ async function uploadHandler(request) {
     const originalPath = path.join(UPLOAD_DIR, `${md5}${ext}`);
     await fs.writeFile(originalPath, buffer);
 
-    // 4. 创建初始数据库登记
+    // 4. 创建初始数据库登记（带预设标签）
     const record = await saveFileRecord({
       md5,
       fileName,
@@ -123,7 +146,7 @@ async function uploadHandler(request) {
       progress: 0,
       originalPath,
       error: null
-    });
+    }, presetId, cacheRetentionDays);
 
     // 5. 后台启动异步预处理脚本
     triggerPreprocessing(md5);
@@ -135,6 +158,7 @@ async function uploadHandler(request) {
       fileName,
       fileSize: file.size,
       md5,
+      presetId,
       cacheHit: false,
       durationMs
     }, `用户上传了新文档 [${fileName}]，大小为 [${(file.size / 1024 / 1024).toFixed(2)} MB]，耗时 [${durationMs}ms]，后台异步预处理中`);

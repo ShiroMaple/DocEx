@@ -236,6 +236,13 @@
         "isAdvancedOpen": false
       },
       {
+        "key": "hospitalName",
+        "label": "医院名称",
+        "desc": "体检报告被检对象所属的医院名称",
+        "example": "",
+        "isAdvancedOpen": false
+      },
+      {
         "key": "reportNo",
         "label": "体检报告编号",
         "desc": "体检报告顶部或封面处的体检编号（条形码下方数字、表头\"编号\"字段），忽略前缀\"体检编号：\"、\"编号：\"及空格。",
@@ -342,8 +349,8 @@
       },
       {
         "key": "heartRate",
-        "label": "心率/脉率",
-        "desc": "心率或脉率数值，单位 次/分钟。",
+        "label": "心率",
+        "desc": "心率数值，单位 次/分钟。",
         "example": "68",
         "isAdvancedOpen": false
       },

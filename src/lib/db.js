@@ -70,16 +70,47 @@ async function renameWithRetry(oldPath, newPath, retries = 5, delay = 50) {
 }
 
 // Internal raw read/write helpers (NOT enqueued)
+function _normalizeFile(file) {
+  if (!file) return file;
+  const uploadTime = file.uploadTime || new Date().toISOString();
+  let presetMap = file.presetMap;
+
+  if (presetMap === undefined || presetMap === null || typeof presetMap !== 'object') {
+    presetMap = {};
+    if (Array.isArray(file.presets) && file.presets.length > 0) {
+      file.presets.forEach(p => {
+        presetMap[p] = uploadTime;
+      });
+    } else {
+      presetMap['default'] = uploadTime;
+    }
+  }
+
+  const presets = Object.keys(presetMap);
+  return {
+    ...file,
+    uploadTime,
+    presetMap,
+    presets
+  };
+}
+
 async function _readDb() {
   await initDb();
   const content = await fs.readFile(DB_PATH, 'utf-8');
-  return JSON.parse(content);
+  const parsed = JSON.parse(content);
+  parsed.files = (parsed.files || []).map(_normalizeFile);
+  return parsed;
 }
 
 async function _writeDb(data) {
   await initDb();
   const tempPath = `${DB_PATH}.tmp`;
-  const jsonStr = JSON.stringify(data, null, 2);
+  const normalizedData = {
+    ...data,
+    files: (data.files || []).map(_normalizeFile)
+  };
+  const jsonStr = JSON.stringify(normalizedData, null, 2);
   await fs.writeFile(tempPath, jsonStr, 'utf-8');
   await renameWithRetry(tempPath, DB_PATH);
 }
@@ -98,20 +129,34 @@ export async function writeDb(data) {
 }
 
 /**
- * 增加或更新文件记录
+ * 增加或更新文件记录，并根据当前 preset 及其缓存天数维护标签引用
+ * @param {object} record 文件记录对象
+ * @param {string|null} [currentPresetId] 当前上传使用的预设 ID (仅在上传/绑定时显式传入，内部更新进度时传 null)
+ * @param {number} [cacheRetentionDays] 预设设定的缓存有效期(天)，0 为不缓存
  */
-export async function saveFileRecord(record) {
+export async function saveFileRecord(record, currentPresetId = null, cacheRetentionDays = 7) {
   return enqueue(async () => {
     const db = await _readDb();
     const index = db.files.findIndex(f => f.md5 === record.md5);
-    
-    const newRecord = {
+    const now = new Date().toISOString();
+
+    let existingFile = index >= 0 ? db.files[index] : null;
+    let presetMap = existingFile ? { ...existingFile.presetMap } : {};
+
+    // 仅当显式传入了 currentPresetId 且 cacheRetentionDays > 0 时，才添加/更新该预设标签
+    if (currentPresetId && Number(cacheRetentionDays) !== 0) {
+      presetMap[currentPresetId] = now;
+    }
+
+    const newRecord = _normalizeFile({
+      ...(existingFile || {}),
       ...record,
-      uploadTime: record.uploadTime || new Date().toISOString()
-    };
+      uploadTime: (existingFile && existingFile.uploadTime) || record.uploadTime || now,
+      presetMap
+    });
 
     if (index >= 0) {
-      db.files[index] = { ...db.files[index], ...newRecord };
+      db.files[index] = newRecord;
     } else {
       db.files.push(newRecord);
     }
@@ -132,60 +177,114 @@ export async function getFileRecord(md5) {
 }
 
 /**
- * 删除文件记录并清理物理文件
+ * 删除文件记录或摘除特定预设标签：
+ * - 若文件关联多个预设标签且指定了 currentPresetId，仅摘除该 presetId 标签；
+ * - 若文件仅剩 1 个标签或未指定 currentPresetId，彻底物理清理文件并删除记录。
+ * @param {string} md5 文件 MD5
+ * @param {string} [currentPresetId] 当前操作所在的预设 ID
  */
-export async function deleteFileRecord(md5) {
+export async function deleteFileRecord(md5, currentPresetId) {
   return enqueue(async () => {
     const db = await _readDb();
     const record = db.files.find(f => f.md5 === md5);
     
-    if (record) {
-      // 1. 删除上传的原始文件
-      if (record.originalPath) {
-        await fs.unlink(record.originalPath).catch(() => {});
-      }
-      
-      // 2. 删除预处理文件夹及其内容
-      const dirPath = path.join(PREPROCESS_DIR, md5);
-      await fs.rm(dirPath, { recursive: true, force: true }).catch(() => {});
-      
-      // 3. 从 db.json 中移除
-      db.files = db.files.filter(f => f.md5 !== md5);
-      await _writeDb(db);
-      return true;
+    if (!record) {
+      return { success: false, error: '未找到该 MD5 记录' };
     }
-    return false;
+
+    const normalized = _normalizeFile(record);
+    let presetMap = { ...normalized.presetMap };
+
+    if (currentPresetId && presetMap[currentPresetId]) {
+      delete presetMap[currentPresetId];
+    }
+
+    const remainingPresets = Object.keys(presetMap);
+
+    // 若还存在其他预设引用，仅摘标签更新记录
+    if (currentPresetId && remainingPresets.length > 0) {
+      normalized.presetMap = presetMap;
+      normalized.presets = remainingPresets;
+      const index = db.files.findIndex(f => f.md5 === md5);
+      db.files[index] = normalized;
+      await _writeDb(db);
+      return {
+        success: true,
+        removedTagOnly: true,
+        removedPreset: currentPresetId,
+        remainingPresets
+      };
+    }
+
+    // 否则无任何引用，彻底物理清理
+    if (normalized.originalPath) {
+      await fs.unlink(normalized.originalPath).catch(() => {});
+    }
+    
+    const dirPath = path.join(PREPROCESS_DIR, md5);
+    await fs.rm(dirPath, { recursive: true, force: true }).catch(() => {});
+    
+    db.files = db.files.filter(f => f.md5 !== md5);
+    await _writeDb(db);
+
+    return {
+      success: true,
+      physicallyDeleted: true
+    };
   });
 }
 
 /**
- * 7天 TTL 清理任务：自动清理超期的记录和预处理产物
+ * 动态 TTL 清理任务：根据各预设配置的 cacheRetentionDays 自动清理超期标签与无引用物理文件
+ * @param {object} [presetRetentionDaysMap] 各预设的天数映射，如 { default: 7, hse: 3 }
  */
-export async function runTtlCleanup() {
+export async function runTtlCleanup(presetRetentionDaysMap = {}) {
   return enqueue(async () => {
     const db = await _readDb();
     const now = Date.now();
-    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-    
     const keptFiles = [];
-    
+
     for (const file of db.files) {
-      const uploadTime = new Date(file.uploadTime).getTime();
-      if (now - uploadTime > SEVEN_DAYS_MS) {
-        console.log(`🧹 TTL Cleanup: 文件 ${file.fileName} (${file.md5}) 已超期 7 天，自动清理中...`);
-        // 清理原始文件
-        if (file.originalPath) {
-          await fs.unlink(file.originalPath).catch(() => {});
+      const normalized = _normalizeFile(file);
+      const presetMap = { ...normalized.presetMap };
+      let hasChanges = false;
+
+      // 检查每个预设标签是否过期
+      for (const [presetId, tagTime] of Object.entries(presetMap)) {
+        const retentionDays = typeof presetRetentionDaysMap[presetId] === 'number'
+          ? presetRetentionDaysMap[presetId]
+          : 7; // 默认 7 天
+
+        const tagTimestamp = new Date(tagTime).getTime();
+        const maxDurationMs = retentionDays * 24 * 60 * 60 * 1000;
+
+        // 0 天或超期 -> 移除该预设标签
+        if (retentionDays === 0 || (now - tagTimestamp > maxDurationMs)) {
+          delete presetMap[presetId];
+          hasChanges = true;
         }
-        // 清理预处理文件夹
-        const dirPath = path.join(PREPROCESS_DIR, file.md5);
+      }
+
+      const remainingPresets = Object.keys(presetMap);
+
+      if (remainingPresets.length === 0) {
+        // 无任何有效预设引用，执行物理删除
+        console.log(`🧹 TTL Cleanup: 文件 ${normalized.fileName} (${normalized.md5}) 失去所有预设有效引用，彻底物理清理中...`);
+        if (normalized.originalPath) {
+          await fs.unlink(normalized.originalPath).catch(() => {});
+        }
+        const dirPath = path.join(PREPROCESS_DIR, normalized.md5);
         await fs.rm(dirPath, { recursive: true, force: true }).catch(() => {});
       } else {
-        keptFiles.push(file);
+        if (hasChanges) {
+          normalized.presetMap = presetMap;
+          normalized.presets = remainingPresets;
+        }
+        keptFiles.push(normalized);
       }
     }
 
-    if (keptFiles.length !== db.files.length) {
+    if (keptFiles.length !== db.files.length || keptFiles.some(f => f.presets.length !== (db.files.find(o => o.md5 === f.md5)?.presets?.length))) {
       db.files = keptFiles;
       await _writeDb(db);
     }

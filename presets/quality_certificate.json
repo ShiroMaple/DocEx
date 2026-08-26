@@ -13,6 +13,8 @@
   "allowCustomFields": true,
   "allowCustomPrompt": true,
   "allowSwitchFields": true,
+  "allowViewCachedFiles": false,
+  "cacheRetentionDays": 7,
   "systemPrompt": "你是一个专业的金属材料质量证明书与产品质保书解析专家。你的任务是：\n根据输入的文档内容（包含文字参考层、表格结构以及视觉截图），提取出所有批号的产品明细、执行标准、化学成分及力学/工艺/无损检验试验结果。\n请依据字段定义完整提取，表格与图片中的信息同样重要。\n文档中若包含多行产品明细，必须逐行拆解，确保返回的 results 数组中的每一项都代表一条独立的产品批次记录，公共的清单号、施工号、日期等信息需继承到每条记录中。",
   "userPrompt": "请分析以下质保书/产品清单文档内容，提取结构化产品批次及检测结果列表：",
   "fieldsRef": "quality_certificate"

@@ -469,6 +469,11 @@ export default function DocumentExtractor({ presetId = null }) {
       });
   }, [presetId]);
 
+  // ── Preset change refetches history files ──
+  useEffect(() => {
+    fetchHistoryFiles();
+  }, [preset]);
+
   // ── Load credentials & configurations dynamically from /api/config ──
   useEffect(() => {
     fetch('/api/config')
@@ -975,10 +980,13 @@ export default function DocumentExtractor({ presetId = null }) {
   // ── Step 1: Upload & Queue list ──
   const fetchHistoryFiles = async () => {
     try {
-      const res = await fetch('/api/files');
+      const curPresetId = presetId || preset?.id || 'default';
+      const res = await fetch(`/api/files?presetId=${encodeURIComponent(curPresetId)}`);
       const data = await res.json();
       if (data.files) {
         setHistoryFiles(data.files);
+      } else {
+        setHistoryFiles([]);
       }
     } catch (e) {
       console.error('获取历史记录失败:', e);
@@ -1041,8 +1049,10 @@ export default function DocumentExtractor({ presetId = null }) {
   };
 
   const uploadAndPreprocessFile = async (file, tempId) => {
+    const curPresetId = presetId || preset?.id || 'default';
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('presetId', curPresetId);
 
     try {
       const res = await fetch('/api/upload', {
@@ -1132,7 +1142,8 @@ export default function DocumentExtractor({ presetId = null }) {
     e.stopPropagation();
 
     try {
-      const res = await fetch(`/api/files?md5=${md5}`, { method: 'DELETE' });
+      const curPresetId = presetId || preset?.id || 'default';
+      const res = await fetch(`/api/files?md5=${encodeURIComponent(md5)}&presetId=${encodeURIComponent(curPresetId)}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || '删除失败');
@@ -2696,7 +2707,7 @@ export default function DocumentExtractor({ presetId = null }) {
                   accept=".pdf,.docx,.jpg,.jpeg,.png"
                   onChange={(e) => handleFilesUpload(e.target.files)}
                 />
-                {historyFiles.length > 0 && (
+                {preset?.allowViewCachedFiles && historyFiles.length > 0 && (
                   <div className="mt-6 border-t border-border-cream pt-4">
                     <h3 className="text-xs font-semibold text-olive-gray mb-3 flex items-center gap-1.5">
                       <span>📄 历史已缓存文档 (点击复用无需重复上传)</span>
