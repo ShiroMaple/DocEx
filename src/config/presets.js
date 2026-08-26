@@ -17,7 +17,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { config } from '../config.js';
+import { config, maskSecretKey, readEnvFromDisk } from './index.js';
 
 const PRESETS_DIR = path.resolve(process.cwd(), 'presets');
 
@@ -74,10 +74,18 @@ export function getResolvedPreset(id) {
   const targetLLMConfigId = rawPreset.llmConfigId || '';
   const matchedLLMConfig = (config.defaultLLMList || []).find(c => targetLLMConfigId && c.id === targetLLMConfigId) || config.defaultLLMConf;
 
-  // 读取与合并大模型 API 凭证 (格式如 HSE_OPENAI_API_KEY，无环境变量配置则使用绑定的模型配置或默认凭证)
+  // 读取与合并大模型 API 凭证 (优先使用 preset.apiKeyEnv，其次按前缀 [ID]_OPENAI_API_KEY，最后使用模型配置默认凭证)
+  let resolvedApiKey = '';
+  if (rawPreset.apiKeyEnv) {
+    resolvedApiKey = config.getEnv(rawPreset.apiKeyEnv, '');
+  }
+  if (!resolvedApiKey) {
+    resolvedApiKey = config.getEnv(`${prefix}_OPENAI_API_KEY`, matchedLLMConfig?.apiKey || config.openai.apiKey || '');
+  }
+
   const provider = config.getEnv(`${prefix}_LLM_PROVIDER`, matchedLLMConfig?.provider || config.llmProvider || 'openai');
   const openai = {
-    apiKey: config.getEnv(`${prefix}_OPENAI_API_KEY`, matchedLLMConfig?.apiKey || config.openai.apiKey || ''),
+    apiKey: resolvedApiKey,
     baseUrl: config.getEnv(`${prefix}_OPENAI_BASE_URL`, matchedLLMConfig?.baseUrl || config.openai.baseUrl || 'https://api.openai.com/v1'),
     model: config.getEnv(`${prefix}_OPENAI_MODEL`, matchedLLMConfig?.model || config.openai.model || 'kimi-k2.7-code'),
     thinkingEffort: matchedLLMConfig?.thinkingEffort || config.defaultLLMConf?.thinkingEffort || 'low'
@@ -214,6 +222,7 @@ export function getSafePresetForClient(id) {
     icon: resolved.icon || (resolved.id === 'default' ? '🌐' : '⚙️'),
     enabled: resolved.enabled !== false,
     llmConfigId: resolved.llmConfigId || '',
+    apiKeyEnv: resolved.apiKeyEnv || '',
     tableConfigId: resolved.tableConfigId || '',
     locked: resolved.locked,
     allowAutoDetectFields: Boolean(resolved.allowAutoDetectFields),
@@ -236,15 +245,16 @@ export function getSafePresetForClient(id) {
       baseUrl: resolved.openai.baseUrl,
       model: resolved.openai.model,
       thinkingEffort: resolved.openai.thinkingEffort || 'low',
+      apiKey: maskSecretKey(resolved.openai.apiKey),
       hasApiKey: Boolean(resolved.openai.apiKey)
     },
     wps: resolved.wps ? {
       ...resolved.wps,
-      appSecret: resolved.wps.appSecret ? '••••••••••••••••••••' : ''
+      appSecret: maskSecretKey(resolved.wps.appSecret)
     } : null,
     lark: resolved.lark ? {
       ...resolved.lark,
-      appSecret: resolved.lark.appSecret ? '••••••••••••••••••••' : ''
+      appSecret: maskSecretKey(resolved.lark.appSecret)
     } : null,
     tableConfig: {
       platform: resolved.platform,
@@ -425,10 +435,65 @@ export function getPresetAuxiliaryData() {
     console.error('读取 llmConfigs 失败:', e);
   }
 
+  // 扫描项目专属大模型 API Key 环境变量列表（仅限项目 .env 文件与 config.json 声明，排除系统环境与表格凭证）
+  let availableEnvKeys = [];
+  try {
+    const parsedEnv = readEnvFromDisk(); // 仅从物理 .env 读取，绝不合并 process.env 宿主系统变量
+    const envKeysFromDotEnv = Object.keys(parsedEnv);
+    
+    // 收集 config.json 中 llm.configs 声明的原始 apiKey 占位符名称
+    let rawConfigLlmKeys = [];
+    try {
+      const configJsonPath = path.resolve(process.cwd(), 'config.json');
+      if (fs.existsSync(configJsonPath)) {
+        const rawJson = JSON.parse(fs.readFileSync(configJsonPath, 'utf-8'));
+        rawConfigLlmKeys = (rawJson.llm?.configs || []).map(c => c.apiKey).filter(Boolean);
+      }
+    } catch {}
+
+    const candidateSet = new Set([...envKeysFromDotEnv, ...rawConfigLlmKeys]);
+
+    // 严谨语义过滤：只保留纯正的大模型 API Key 环境变量名，严格排除文档平台凭据 (WPS/Lark) 与系统变量
+    const isLlmApiKeyName = (key) => {
+      if (!key || typeof key !== 'string') return false;
+      const upper = key.toUpperCase();
+
+      // 必须是合法的环境变量标识符（不能是 sk-xxx 这种真实秘钥明文）
+      if (!/^[A-Za-z0-9_]+$/.test(key) || key.startsWith('sk-') || key.length > 50) {
+        return false;
+      }
+
+      // 1. 严格排除文档表格平台凭据与通用系统变量
+      if (/WPS_|LARK_|FEISHU_|_APP_ID|_APP_SECRET|_APP_TOKEN|_TABLE_ID|PORT|LOG_|NODE_ENV|RATE_LIMIT/i.test(upper)) {
+        return false;
+      }
+
+      // 2. 匹配标准 LLM API Key 命名特征
+      if (/_API_KEY\b|_APIKEY\b|_LLM_KEY\b/i.test(upper)) return true;
+      if (/(KIMI|OPENAI|DEEPSEEK|MOONSHOT|CLAUDE|QWEN|ZHIPU|ANTHROPIC|GEMINI|BAIDU|MIMO).*KEY/i.test(upper)) return true;
+
+      // 3. 匹配 config.json 中已声明的模型 Key 变量
+      if (rawConfigLlmKeys.includes(key)) return true;
+
+      return false;
+    };
+
+    availableEnvKeys = Array.from(candidateSet)
+      .filter(isLlmApiKeyName)
+      .sort()
+      .map(key => ({
+        key,
+        hasValue: Boolean(parsedEnv[key] && parsedEnv[key].trim())
+      }));
+  } catch (e) {
+    console.error('扫描大模型环境变量列表失败:', e);
+  }
+
   return {
     fieldsGroups,
     tableConfigs,
-    llmConfigs
+    llmConfigs,
+    availableEnvKeys
   };
 }
 

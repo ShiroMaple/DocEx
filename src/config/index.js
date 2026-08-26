@@ -226,4 +226,31 @@ export const config = {
   }
 };
 
+/**
+ * 对敏感凭证（如 API Key, Token）进行安全首末掩码处理
+ * 规则：
+ * - 长度 >= 12: 保留前 4 位和后 4 位，中间固定 8 个圆点（如 sk-k••••••••3821）
+ * - 长度 6~11: 保留前 2 位和后 2 位，中间固定 4 个圆点（如 sk••••89）
+ * - 长度 < 6 或空: 返回全掩码或空字符串
+ */
+export function maskSecretKey(key) {
+  if (!key || typeof key !== 'string') return '';
+  const trimmed = key.trim();
+  if (!trimmed) return '';
+  // 如果已经是掩码形式，直接返回
+  if (trimmed.includes('••••')) return trimmed;
+
+  if (trimmed.length >= 12) {
+    const head = trimmed.slice(0, 4);
+    const tail = trimmed.slice(-4);
+    return `${head}••••••••${tail}`;
+  }
+  if (trimmed.length >= 6) {
+    const head = trimmed.slice(0, 2);
+    const tail = trimmed.slice(-2);
+    return `${head}••••${tail}`;
+  }
+  return '••••••••';
+}
+
 export default config;

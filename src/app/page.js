@@ -2530,14 +2530,21 @@ export default function DocumentExtractor({ presetId = null }) {
                         />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-olive-gray uppercase tracking-wider">API Key</label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-olive-gray uppercase tracking-wider">API Key</label>
+                          {llmConfig.apiKey && (
+                            <span className="text-[10px] text-stone-gray font-mono">
+                              {llmConfig.apiKey.includes('••••') ? '已脱敏保护' : '自定义输入'}
+                            </span>
+                          )}
+                        </div>
                         <input
-                          type="password"
+                          type="text"
                           value={llmConfig.apiKey}
                           onChange={(e) => setLlmConfig({ ...llmConfig, apiKey: e.target.value })}
                           disabled={!canCustomModel || selectedConfigId === 'default'}
-                          className="bg-warm-sand border border-border-warm rounded px-3 py-1.5 text-xs outline-none focus:bg-ivory focus:border-focus-blue focus:ring-1 focus:ring-focus-blue transition w-full disabled:opacity-60"
-                          placeholder="••••••••••••••••••••"
+                          className="bg-warm-sand border border-border-warm rounded px-3 py-1.5 text-xs outline-none focus:bg-ivory focus:border-focus-blue focus:ring-1 focus:ring-focus-blue transition w-full disabled:opacity-60 font-mono tracking-tight"
+                          placeholder="未配置 API Key"
                         />
                       </div>
                     </div>

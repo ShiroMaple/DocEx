@@ -7,6 +7,7 @@
   "icon": "🌐",
   "enabled": true,
   "llmConfigId": "reco-standard",
+  "apiKeyEnv": "",
   "tableConfigId": "wps_test",
   "locked": false,
   "allowAutoDetectFields": true,

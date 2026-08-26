@@ -30,7 +30,7 @@ import {
  */
 export const GET = withLogging(async (request) => {
   const presets = getAllRawPresets();
-  const { fieldsGroups, tableConfigs, llmConfigs } = getPresetAuxiliaryData();
+  const { fieldsGroups, tableConfigs, llmConfigs, availableEnvKeys } = getPresetAuxiliaryData();
 
   logger.info({
     event: 'ADMIN_PRESETS_FETCHED',
@@ -43,7 +43,8 @@ export const GET = withLogging(async (request) => {
     presets,
     fieldsGroups,
     tableConfigs,
-    llmConfigs
+    llmConfigs,
+    availableEnvKeys
   });
 });
 
@@ -167,6 +168,7 @@ export const PUT = withLogging(async (request) => {
     department: saved.department,
     enabled: saved.enabled !== false,
     llmConfigId: saved.llmConfigId || '',
+    apiKeyEnv: saved.apiKeyEnv || '',
     tableConfigId: saved.tableConfigId || '',
     allowViewCachedFiles: Boolean(saved.allowViewCachedFiles),
     cacheRetentionDays: saved.cacheRetentionDays

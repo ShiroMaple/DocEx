@@ -9,6 +9,7 @@
   "badgeText": "专属徽标文案 (选填)。作用：显示在专属页面顶部 Header 胶囊按钮中的文案，例如 '🛡️ 安全环保部专用版'",
   "enabled": "预设总启用开关 (布尔值 true / false，默认 true)。作用：控制预设前台访问与下拉菜单的可见性，停用后隐藏入口且禁止访问 (default 内置预设始终锁定启用)",
   "llmConfigId": "引用 config.json 中 llm.configs 的模型配置 ID (如 'reco-standard' 或 'reco-highspeed')。作用：指定该预设默认绑定使用的大模型配置",
+  "apiKeyEnv": "独立覆盖 API Key 的环境变量名称 (选填，如 'KIMI_API_KEY_HSE')。作用：若填写则优先从指定环境变量读取 API Key；若为空则继承模型配置的默认环境变量",
   "tableConfigId": "引用 config.json 中 tables.configs 的多维表格配置 ID (如 'wps_test' 或 'wps_hse')。作用：指定该预设默认绑定的多维表格",
 
   "locked": "全局锁定开关 (布尔值 true / false)。作用：简易总开关，当未指定细粒度权限时，true 代表全部锁定",

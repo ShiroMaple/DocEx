@@ -7,6 +7,7 @@
   "icon": "/icons/safety_problem.svg",
   "enabled": true,
   "llmConfigId": "reco-standard",
+  "apiKeyEnv": "KIMI_API_KEY_HSE",
   "tableConfigId": "wps_hse",
   "locked": true,
   "allowAutoDetectFields": false,

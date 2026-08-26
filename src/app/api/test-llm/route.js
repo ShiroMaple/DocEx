@@ -29,7 +29,7 @@ async function testLlmHandler(request) {
     let { apiKey, baseUrl, model } = await request.json();
 
     // 1. 如果传入的是前端安全脱敏掩码，则从物理磁盘配置中动态还原真实 Key
-    const isMask = apiKey === '••••••••••••••••••••';
+    const isMask = !apiKey || apiKey.includes('••••');
     const diskConfig = readConfigFromDisk();
     
     if (isMask) {

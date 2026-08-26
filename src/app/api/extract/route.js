@@ -22,6 +22,7 @@ import { fileURLToPath } from 'url';
 import { getFileRecord } from '../../../lib/db.js';
 import { extractCustomFieldsStream } from '../../../services/llmService.js';
 import { readConfigFromDisk } from '../../../config/index.js';
+import { getResolvedPreset } from '../../../config/presets.js';
 import { checkRateLimit } from '../../../lib/rateLimit.js';
 import { withLogging, logger } from '../../../lib/logger.js';
 
@@ -101,15 +102,23 @@ async function extractHandler(request) {
 
     // 掩码物理还原
     let activeApiKey = llmConfig.apiKey || '';
-    const isMask = activeApiKey === '••••••••••••••••••••';
+    const isMask = !activeApiKey || activeApiKey.includes('••••');
     const diskConfig = readConfigFromDisk();
 
     if (isMask) {
-      const match = diskConfig.defaultLLMList.find(c => c.model === llmConfig.model && c.baseUrl === llmConfig.baseUrl);
-      if (match && match.apiKey) {
-        activeApiKey = match.apiKey;
-      } else {
-        activeApiKey = diskConfig.defaultLLMConf.apiKey;
+      if (presetId) {
+        const resolvedPreset = getResolvedPreset(presetId);
+        if (resolvedPreset && resolvedPreset.openai && resolvedPreset.openai.apiKey) {
+          activeApiKey = resolvedPreset.openai.apiKey;
+        }
+      }
+      if (!activeApiKey) {
+        const match = diskConfig.defaultLLMList.find(c => c.model === llmConfig.model && c.baseUrl === llmConfig.baseUrl);
+        if (match && match.apiKey) {
+          activeApiKey = match.apiKey;
+        } else {
+          activeApiKey = diskConfig.defaultLLMConf.apiKey;
+        }
       }
     }
 

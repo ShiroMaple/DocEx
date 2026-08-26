@@ -38,6 +38,7 @@ export default function AdminControlPanelPage() {
   const [fieldsGroups, setFieldsGroups] = useState([]);
   const [tableConfigs, setTableConfigs] = useState([]);
   const [llmConfigs, setLlmConfigs] = useState([]);
+  const [availableEnvKeys, setAvailableEnvKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,6 +84,7 @@ export default function AdminControlPanelPage() {
         setFieldsGroups(data.fieldsGroups || []);
         setTableConfigs(data.tableConfigs || []);
         setLlmConfigs(data.llmConfigs || []);
+        setAvailableEnvKeys(data.availableEnvKeys || []);
 
         const targetId = preferredSelectId || selectedId;
         const matched = (data.presets || []).find(p => p.id === targetId) || data.presets[0];
@@ -688,14 +690,14 @@ export default function AdminControlPanelPage() {
                       </div>
                     </div>
 
-                    {/* 模块 2：关联设置 (LLM, Fields & Tables) */}
+                    {/* 模块 2：关联设置 (LLM, Env, Fields & Tables) */}
                     <div className="bg-white border border-[#e8e6dc] rounded-xl p-4 flex flex-col gap-3.5 shadow-2xs">
                       <div className="flex items-center gap-2 border-b border-[#f0eee6] pb-2 text-xs font-bold text-[#141413]">
-                        <Database size={14} className="text-[#c96442]" /> 关联模型、字段库与多维数据表
+                        <Database size={14} className="text-[#c96442]" /> 关联模型、API Key 变量、字段库与多维数据表
                       </div>
 
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
-                        {/* 关联大模型 */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                        {/* 1. 关联大模型 */}
                         <div className="bg-[#faf9f5]/70 border border-[#e8e6dc] rounded-xl p-3 flex flex-col justify-between gap-2.5">
                           <div>
                             <div className="flex items-center justify-between gap-1 mb-1">
@@ -722,7 +724,61 @@ export default function AdminControlPanelPage() {
                           </div>
                         </div>
 
-                        {/* 关联字段组 */}
+                        {/* 2. API Key 环境变量覆写 (选填) */}
+                        <div className="bg-[#faf9f5]/70 border border-[#e8e6dc] rounded-xl p-3 flex flex-col justify-between gap-2.5">
+                          <div>
+                            <div className="flex items-center justify-between gap-1 mb-1">
+                              <span className="text-xs font-semibold text-[#141413]">API Key 变量覆写</span>
+                              <span className="text-[10px] bg-[#e8e6dc]/80 text-[#5e5d59] px-1.5 py-0.5 rounded font-mono flex-shrink-0">.env</span>
+                            </div>
+                            <p className="text-[11px] text-[#87867f] leading-tight">
+                              选填，按部门隔离计费或绑定专属 API Key
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                list="available-env-keys-list"
+                                value={currentPreset.apiKeyEnv || ''}
+                                onChange={(e) => handleFieldChange('apiKeyEnv', e.target.value.trim())}
+                                placeholder="继承模型配置默认环境变量"
+                                className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#e8e6dc] rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#3898ec] text-[#141413] shadow-2xs font-mono"
+                              />
+                            </div>
+                            <datalist id="available-env-keys-list">
+                              {availableEnvKeys.map(k => (
+                                <option key={k.key} value={k.key}>
+                                  {k.key} {k.hasValue ? '(已就绪)' : '(未赋值)'}
+                                </option>
+                              ))}
+                            </datalist>
+
+                            {/* 状态检测与告警提示 */}
+                            {Boolean(currentPreset.apiKeyEnv) && (
+                              <div>
+                                {(() => {
+                                  const envItem = availableEnvKeys.find(k => k.key === currentPreset.apiKeyEnv);
+                                  const isMissingOrEmpty = !envItem || !envItem.hasValue;
+                                  if (isMissingOrEmpty) {
+                                    return (
+                                      <span className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded flex items-center gap-1 font-medium leading-tight">
+                                        ⚠️ 提示: [{currentPreset.apiKeyEnv}] 在当前服务器 .env 中尚未定义或为空
+                                      </span>
+                                    );
+                                  }
+                                  return (
+                                    <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 rounded flex items-center gap-1 font-medium leading-tight">
+                                      ✓ 环境变量已配置并生效
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 3. 关联字段组 */}
                         <div className="bg-[#faf9f5]/70 border border-[#e8e6dc] rounded-xl p-3 flex flex-col justify-between gap-2.5">
                           <div>
                             <div className="flex items-center justify-between gap-1 mb-1">
@@ -748,7 +804,7 @@ export default function AdminControlPanelPage() {
                           </div>
                         </div>
 
-                        {/* 关联多维表格 */}
+                        {/* 4. 关联多维表格 */}
                         <div className="bg-[#faf9f5]/70 border border-[#e8e6dc] rounded-xl p-3 flex flex-col justify-between gap-2.5">
                           <div>
                             <div className="flex items-center justify-between gap-1 mb-1">
