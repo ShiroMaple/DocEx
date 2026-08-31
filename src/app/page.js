@@ -245,10 +245,11 @@ export default function DocumentExtractor({ presetId = null }) {
   };
 
   // ── Dynamic Column Widths for Step 3 and Step 4 ──
-  const step4FieldWidths = fields.map((f, idx) => getColWidthPx(f.key || `field_${idx + 1}`, f.label || `列_${idx + 1}`, extractedIssues));
+  const safeFields = Array.isArray(fields) ? fields : [];
+  const step4FieldWidths = safeFields.map((f, idx) => getColWidthPx(f.key || `field_${idx + 1}`, f.label || `列_${idx + 1}`, extractedIssues));
   const step4TotalWidth = 50 + 120 + step4FieldWidths.reduce((a, b) => a + b, 0);
 
-  const step3FieldWidths = fields.map((f, idx) => {
+  const step3FieldWidths = safeFields.map((f, idx) => {
     if (customColWidths[idx] !== undefined) return customColWidths[idx];
     return getColWidthPx(f.key || `field_${idx + 1}`, f.label || `列_${idx + 1}`, extractedIssues);
   });
@@ -2828,7 +2829,7 @@ export default function DocumentExtractor({ presetId = null }) {
                                 const selectedGroup = preset.availableFieldsList.find(g => g.id === newId);
                                 if (selectedGroup) {
                                   setSelectedFieldsId(newId);
-                                  setFields(selectedGroup.fields);
+                                  setFields(Array.isArray(selectedGroup.fields) ? selectedGroup.fields : []);
                                   setExtractedIssues([]); // 清空解析结果以防结构错位
                                   showToast(`📋 已成功切换为【${selectedGroup.name}】字段配置`);
                                 }
@@ -2930,7 +2931,7 @@ export default function DocumentExtractor({ presetId = null }) {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border-cream">
-                          {fields.map((f, index) => {
+                          {(Array.isArray(fields) ? fields : []).map((f, index) => {
                             const currentKey = f.key || `field_${index + 1}`;
                             const mappedCol = Object.keys(fieldMappings).find(col => fieldMappings[col] === currentKey);
                             const showMissingAlert = isTableConnected && !mappedCol && f.label;

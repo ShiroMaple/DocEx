@@ -144,7 +144,8 @@ export function getResolvedPreset(id) {
           id: group.id,
           name: group.name,
           description: group.description || '',
-          fieldCount: Array.isArray(group.fields) ? group.fields.length : 0
+          fieldCount: Array.isArray(group.fields) ? group.fields.length : 0,
+          fields: group.fields || []
         }));
 
         const refKey = rawPreset.fieldsRef || targetId;
