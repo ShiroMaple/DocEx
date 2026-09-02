@@ -20,7 +20,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import OpenAI from 'openai';
 import { getFileRecord } from '../../../lib/db.js';
-import { readConfigFromDisk } from '../../../config/index.js';
+import { resolveLLMConfig } from '../../../config/presets.js';
 import { withLogging, logger } from '../../../lib/logger.js';
 
 const PREPROCESS_DIR = path.resolve(process.cwd(), 'data/preprocessed');
@@ -38,28 +38,17 @@ async function autoDetectFieldsHandler(request) {
   try {
     const startTime = Date.now();
     const jsonBody = await request.json();
-    const { md5 } = jsonBody;
+    const { md5, presetId } = jsonBody;
     const llmConfig = jsonBody.llmConfig || {};
 
     if (!md5) {
       return NextResponse.json({ error: '缺少待识别文档的 md5 参数' }, { status: 400 });
     }
 
-    // 1. 物理安全凭证还原
-    let activeApiKey = llmConfig.apiKey || '';
-    const isMask = activeApiKey === '••••••••••••••••••••';
-    const diskConfig = readConfigFromDisk();
+    // 1. 物理安全凭证统一解析与还原
+    const resolvedLLM = resolveLLMConfig(llmConfig, presetId);
 
-    if (isMask) {
-      const match = diskConfig.defaultLLMList.find(c => c.model === llmConfig.model && c.baseUrl === llmConfig.baseUrl);
-      if (match && match.apiKey) {
-        activeApiKey = match.apiKey;
-      } else {
-        activeApiKey = diskConfig.defaultLLMConf.apiKey;
-      }
-    }
-
-    if (!activeApiKey) {
+    if (!resolvedLLM.apiKey) {
       return NextResponse.json({ error: '模型 API Key 缺失，请先在顶部设置您的 API 凭证' }, { status: 400 });
     }
 
@@ -151,12 +140,12 @@ async function autoDetectFieldsHandler(request) {
 
     // 4. 初始化大模型客户端
     const openai = new OpenAI({
-      apiKey: activeApiKey,
-      baseURL: llmConfig.baseUrl || 'https://api.moonshot.cn/v1',
+      apiKey: resolvedLLM.apiKey,
+      baseURL: resolvedLLM.baseUrl,
       timeout: 60000 // 放宽至 60 秒超时保护
     });
 
-    const isVision = isVisionModel(llmConfig.model) && imageBase64;
+    const isVision = isVisionModel(resolvedLLM.model) && imageBase64;
     const messages = [
       {
         role: 'system',

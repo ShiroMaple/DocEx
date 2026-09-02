@@ -17,7 +17,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { config, maskSecretKey, readEnvFromDisk } from './index.js';
+import { config, maskSecretKey, readEnvFromDisk, readConfigFromDisk } from './index.js';
 
 const PRESETS_DIR = path.resolve(process.cwd(), 'presets');
 
@@ -495,6 +495,65 @@ export function getPresetAuxiliaryData() {
     tableConfigs,
     llmConfigs,
     availableEnvKeys
+  };
+}
+
+/**
+ * 统一解析并还原大模型凭据配置（支持脱敏掩码还原、预设独立 API Key、模型列表匹配与默认兜底）
+ * @param {object} inputConfig - 前端传入的 LLM 配置对象 { apiKey, baseUrl, model, thinkingEffort, provider }
+ * @param {string|null} [presetId] - 可选的当前预设标识符（如 'hse', 'quality_certificate'）
+ * @returns {{ apiKey: string, baseUrl: string, model: string, thinkingEffort: string, provider: string, isMaskRestored: boolean, isDefaultKey: boolean }}
+ */
+export function resolveLLMConfig(inputConfig = {}, presetId = null) {
+  const diskConfig = readConfigFromDisk();
+  const rawKey = (inputConfig.apiKey || '').trim();
+  const isMask = !rawKey || rawKey.includes('••••');
+  let activeApiKey = isMask ? '' : rawKey;
+  let isMaskRestored = false;
+
+  if (isMask) {
+    // 1. 优先尝试读取预设级绑定的 API Key
+    if (presetId) {
+      try {
+        const resolvedPreset = getResolvedPreset(presetId);
+        if (resolvedPreset?.openai?.apiKey) {
+          activeApiKey = resolvedPreset.openai.apiKey;
+          isMaskRestored = true;
+        }
+      } catch (e) {
+        console.error(`读取预设 [${presetId}] 专属 API Key 失败:`, e);
+      }
+    }
+
+    // 2. 尝试从 config.json 的 defaultLLMList 中按 model/baseUrl 匹配
+    if (!activeApiKey && inputConfig.model) {
+      const match = (diskConfig.defaultLLMList || []).find(
+        c => c.model === inputConfig.model && (!inputConfig.baseUrl || c.baseUrl === inputConfig.baseUrl)
+      );
+      if (match?.apiKey) {
+        activeApiKey = match.apiKey;
+        isMaskRestored = true;
+      }
+    }
+
+    // 3. 兜底使用系统全局默认 API Key
+    if (!activeApiKey) {
+      activeApiKey = diskConfig.defaultLLMConf?.apiKey || config.openai?.apiKey || '';
+      if (activeApiKey) isMaskRestored = true;
+    }
+  }
+
+  const defaultConf = diskConfig.defaultLLMConf || {};
+  const isDefaultKey = !activeApiKey || activeApiKey === defaultConf.apiKey || activeApiKey === config.openai?.apiKey;
+
+  return {
+    apiKey: activeApiKey,
+    baseUrl: inputConfig.baseUrl || defaultConf.baseUrl || config.openai?.baseUrl || 'https://api.openai.com/v1',
+    model: inputConfig.model || defaultConf.model || config.openai?.model || 'kimi-k2.7-code',
+    thinkingEffort: inputConfig.thinkingEffort || defaultConf.thinkingEffort || 'low',
+    provider: inputConfig.provider || defaultConf.provider || 'openai',
+    isMaskRestored,
+    isDefaultKey
   };
 }
 

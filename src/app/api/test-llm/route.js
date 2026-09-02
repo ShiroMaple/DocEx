@@ -17,7 +17,7 @@
 
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { readConfigFromDisk } from '../../../config/index.js';
+import { resolveLLMConfig } from '../../../config/presets.js';
 import { checkRateLimit } from '../../../lib/rateLimit.js';
 import { withLogging, logger } from '../../../lib/logger.js';
 
@@ -26,23 +26,18 @@ import { withLogging, logger } from '../../../lib/logger.js';
  */
 async function testLlmHandler(request) {
   try {
-    let { apiKey, baseUrl, model } = await request.json();
+    const jsonBody = await request.json();
+    const { presetId } = jsonBody;
+    const inputConfig = jsonBody.llmConfig || {
+      apiKey: jsonBody.apiKey,
+      baseUrl: jsonBody.baseUrl,
+      model: jsonBody.model
+    };
 
-    // 1. 如果传入的是前端安全脱敏掩码，则从物理磁盘配置中动态还原真实 Key
-    const isMask = !apiKey || apiKey.includes('••••');
-    const diskConfig = readConfigFromDisk();
-    
-    if (isMask) {
-      const match = diskConfig.defaultLLMList.find(c => c.model === model && c.baseUrl === baseUrl);
-      if (match && match.apiKey) {
-        apiKey = match.apiKey;
-      } else {
-        apiKey = diskConfig.defaultLLMConf.apiKey;
-      }
-    }
+    // 1. 物理安全凭证统一解析与还原
+    const resolvedLLM = resolveLLMConfig(inputConfig, presetId);
 
-    const isDefaultKey = !apiKey || apiKey === diskConfig.defaultLLMConf.apiKey;
-    if (isDefaultKey) {
+    if (resolvedLLM.isDefaultKey) {
       const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
       if (!checkRateLimit(ip)) {
         logger.warn({ event: 'RATE_LIMIT_EXCEEDED', ip }, '默认 API Key 频次超限被拦截');
@@ -52,33 +47,25 @@ async function testLlmHandler(request) {
       }
     }
 
-    if (!apiKey) {
-      apiKey = diskConfig.defaultLLMConf.apiKey;
-    }
-    if (!baseUrl) {
-      baseUrl = diskConfig.defaultLLMConf.baseUrl;
-    }
-    if (!model) {
-      model = diskConfig.defaultLLMConf.model;
-    }
-
-    if (!apiKey || !model) {
+    if (!resolvedLLM.apiKey || !resolvedLLM.model) {
       return NextResponse.json({ error: 'apiKey 和 model 为必填参数' }, { status: 400 });
     }
 
     // 2. 初始化 OpenAI 客户端，增加 8 秒超时限制保护防止代理或配置错误导致长时间挂起
     const openai = new OpenAI({
-      apiKey: apiKey,
-      baseURL: baseUrl || 'https://api.openai.com/v1',
+      apiKey: resolvedLLM.apiKey,
+      baseURL: resolvedLLM.baseUrl || 'https://api.openai.com/v1',
       timeout: 8000
     });
+
+    const targetModel = resolvedLLM.model;
 
     let supportVision = false;
 
     // 3. 首先尝试进行多模态图片识别测试 (1x1 像素透明 PNG)
     try {
       const visionResponse = await openai.chat.completions.create({
-        model: model,
+        model: targetModel,
         max_tokens: 5,
         messages: [
           {
@@ -101,7 +88,7 @@ async function testLlmHandler(request) {
     } catch (visionError) {
       logger.warn({
         event: 'TEST_LLM_VISION_FAILED',
-        model,
+        model: targetModel,
         error: visionError.message
       }, '多模态 Vision 测试失败，将尝试纯文本可用性测试');
     }
@@ -110,7 +97,7 @@ async function testLlmHandler(request) {
     if (!supportVision) {
       try {
         const textResponse = await openai.chat.completions.create({
-          model: model,
+          model: targetModel,
           max_tokens: 5,
           messages: [{ role: 'user', content: 'Hi' }]
         });
@@ -122,7 +109,7 @@ async function testLlmHandler(request) {
         // 说明模型连通性彻底失败
         logger.error({
           event: 'TEST_LLM_TEXT_FAILED',
-          model,
+          model: targetModel,
           error: textError.message
         }, '大模型连通测试彻底失败');
         return NextResponse.json({ 
@@ -134,14 +121,14 @@ async function testLlmHandler(request) {
 
     logger.info({
       event: 'TEST_LLM_SUCCESS',
-      model,
+      model: targetModel,
       supportVision
     }, '大模型连通测试成功');
 
     return NextResponse.json({
       success: true,
       supportVision,
-      model,
+      model: targetModel,
       message: supportVision ? '模型连通成功，支持 Vision 多模态' : '模型连通成功，仅支持纯文本识别'
     });
 

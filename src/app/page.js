@@ -322,7 +322,8 @@ export default function DocumentExtractor({ presetId = null }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         md5: firstFile.md5,
-        llmConfig
+        llmConfig,
+        presetId: preset?.id || ''
       }),
       signal: controller.signal
     })
@@ -953,11 +954,10 @@ export default function DocumentExtractor({ presetId = null }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          apiKey: llmConfig.apiKey,
-          baseUrl: llmConfig.baseUrl,
-          model: llmConfig.model,
+          llmConfig,
+          presetId: preset?.id || '',
           prompt: customPrompt,
-          fields: fields.map((f, idx) => ({
+          fields: (fields || []).map((f, idx) => ({
             key: f.key || `field_${idx + 1}`,
             desc: f.desc || '',
             example: f.example || ''

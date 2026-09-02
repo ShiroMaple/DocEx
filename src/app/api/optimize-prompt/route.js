@@ -17,7 +17,7 @@
 
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { config } from '../../../config.js';
+import { resolveLLMConfig } from '../../../config/presets.js';
 import { checkRateLimit } from '../../../lib/rateLimit.js';
 import { withLogging, logger } from '../../../lib/logger.js';
 
@@ -26,10 +26,18 @@ import { withLogging, logger } from '../../../lib/logger.js';
  */
 async function optimizePromptHandler(request) {
   try {
-    let { apiKey, baseUrl, model, prompt, fields } = await request.json();
+    const jsonBody = await request.json();
+    const { prompt, fields, presetId } = jsonBody;
+    const inputConfig = jsonBody.llmConfig || {
+      apiKey: jsonBody.apiKey,
+      baseUrl: jsonBody.baseUrl,
+      model: jsonBody.model
+    };
 
-    const isDefaultKey = !apiKey || apiKey === config.openai.apiKey;
-    if (isDefaultKey) {
+    // 1. 物理安全凭证统一解析与还原
+    const resolvedLLM = resolveLLMConfig(inputConfig, presetId);
+
+    if (resolvedLLM.isDefaultKey) {
       const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
       if (!checkRateLimit(ip)) {
         logger.warn({ event: 'RATE_LIMIT_EXCEEDED', ip }, '默认 API Key 频次超限被拦截');
@@ -39,23 +47,13 @@ async function optimizePromptHandler(request) {
       }
     }
 
-    if (!apiKey) {
-      apiKey = config.openai.apiKey;
-    }
-    if (!baseUrl) {
-      baseUrl = config.openai.baseUrl;
-    }
-    if (!model) {
-      model = config.openai.model;
-    }
-
-    if (!apiKey || !model) {
+    if (!resolvedLLM.apiKey || !resolvedLLM.model) {
       return NextResponse.json({ error: '未配置大模型 API Key 或模型名称，请先在 LLM 配置页中连接并验证' }, { status: 400 });
     }
 
     const openai = new OpenAI({
-      apiKey: apiKey,
-      baseURL: baseUrl || 'https://api.openai.com/v1'
+      apiKey: resolvedLLM.apiKey,
+      baseURL: resolvedLLM.baseUrl || 'https://api.openai.com/v1'
     });
 
     const fieldsDesc = fields.map(f => `- 字段键名: ${f.key}, 描述: ${f.desc}, 示例: ${f.example}`).join('\n');
@@ -76,7 +74,7 @@ ${fieldsDesc}
 4. 只返回优化后的提示词文本正文本身，不要包含任何 markdown 块或解释说明文字。`;
 
     const response = await openai.chat.completions.create({
-      model: model,
+      model: resolvedLLM.model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: '请帮我优化上述提示词：' }
@@ -92,7 +90,7 @@ ${fieldsDesc}
     
     logger.info({
       event: 'PROMPT_OPTIMIZED',
-      model,
+      model: resolvedLLM.model,
       usage
     }, '提示词优化成功');
 
