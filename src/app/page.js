@@ -301,12 +301,12 @@ export default function DocumentExtractor({ presetId = null }) {
 
   const autoDetectFields = () => {
     if (!llmConnected) {
-      showToast('⚠️ 智能分析受阻：请先在右上角AI模型网关配置中进行测试连接通过', 'error');
+      showToast('⚠️ 请先在右上角AI模型网关配置中进行测试连接通过', 'error');
       return;
     }
     const doneFiles = filesQueue.filter(f => f.status === 'done');
     if (doneFiles.length === 0) {
-      showToast('⚠️ 智能分析受阻：请先在步骤 1 中上传并就绪至少一个待分析文档！', 'error');
+      showToast('⚠️ 请先在步骤 1 中上传并就绪至少一个待分析文档！', 'error');
       return;
     }
     const firstFile = doneFiles[0];
@@ -315,7 +315,7 @@ export default function DocumentExtractor({ presetId = null }) {
     setDetectAbortController(controller);
     setDetectingStreamText('');
     setIsDetectingFields(true);
-    showToast('🔮 AI 正在尝试智能分析文档首页以推演最佳字段定义...');
+    showToast('AI在尝试智能分析文档首页以推演最佳字段定义...');
 
     fetch('/api/auto-detect-fields', {
       method: 'POST',
@@ -412,7 +412,7 @@ export default function DocumentExtractor({ presetId = null }) {
             if (p.llmConfig.hasApiKey) {
               setLlmConnected(true);
             }
-            // 联动大模型下拉框当前生效 ID，防止 UI 不同步
+            // 联动模型下拉框当前生效 ID，防止 UI 不同步
             const match = (p.llmConfigId && configList.find(c => c.id === p.llmConfigId)) || configList.find(c => c.model === p.llmConfig.model && c.baseUrl === p.llmConfig.baseUrl);
             if (match) {
               setSelectedConfigId(match.id);
@@ -891,7 +891,7 @@ export default function DocumentExtractor({ presetId = null }) {
       });
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || '连接测试大模型失败');
+      if (!res.ok) throw new Error(data.error || '连接测试模型失败');
 
       setLlmSupportVision(data.supportVision);
       setLlmConnected(true);
@@ -1252,7 +1252,7 @@ export default function DocumentExtractor({ presetId = null }) {
       return;
     }
 
-    // 解耦后，大模型解析前不再阻断校验多维表格连接
+    // 解耦后，模型解析前不再阻断校验多维表格连接
 
     setExtractionError('');
     setExtractedIssues([]);
@@ -1528,12 +1528,12 @@ export default function DocumentExtractor({ presetId = null }) {
     if (allExtractedIssues.length > 0) {
       showToast('所有文档提取成功！');
     } else {
-      showToast('⚠️ 大模型解析结果为空，已安全熔断！');
+      showToast('⚠️ 模型解析结果为空，已安全熔断！');
     }
   };
 
   const retryExtractionForFile = async (file) => {
-    const confirmRetry = window.confirm('将移除下表中相关记录，由大模型重新解析，是否确认？');
+    const confirmRetry = window.confirm('将移除下表中相关记录，由模型重新解析，是否确认？');
     if (!confirmRetry) return;
 
     // 解耦后，单文件重试不再检验多维表连接状态
@@ -2242,7 +2242,7 @@ export default function DocumentExtractor({ presetId = null }) {
                   }`}
               >
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isTableConnected ? 'bg-green-600 shadow-[0_0_6px_#16a34a]' : 'bg-stone-gray'}`} />
-                <span className="truncate">{isTableConnected ? `📊 已连接: ${platform} ${tableName}` : '📊 多维表格未连接'}</span>
+                <span className="truncate">{isTableConnected ? ` 已连接: ${platform} ${tableName}` : ' 多维表格未连接'}</span>
               </button>
 
               <AnimatePresence>
@@ -2458,7 +2458,7 @@ export default function DocumentExtractor({ presetId = null }) {
                   }`}
               >
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${llmConnected ? 'bg-green-600 shadow-[0_0_6px_#16a34a]' : 'bg-stone-gray'}`} />
-                <span className="truncate">{llmConnected ? `🤖 ${llmConfig.provider} ${llmConfig.model}` : '🤖 模型未验证'}</span>
+                <span className="truncate">{llmConnected ? ` ${llmConfig.provider} ${llmConfig.model}` : ' 模型未验证'}</span>
               </button>
 
               <AnimatePresence>
@@ -2565,7 +2565,7 @@ export default function DocumentExtractor({ presetId = null }) {
 
                     {!llmSupportVision && llmConnected && (
                       <div className="text-xs text-amber-700 bg-amber-50 border border-amber-100 p-2 rounded mt-2">
-                        ⚠️ 提示: 目标大模型不支持多模态视觉识图，系统将自动降级为基于纯文字层内容提取。
+                        ⚠️ 提示: 目标模型不支持多模态视觉识图，系统将自动降级为基于纯文字层内容提取。
                       </div>
                     )}
                   </motion.div>
@@ -2917,7 +2917,7 @@ export default function DocumentExtractor({ presetId = null }) {
                     )}
 
                     <p className="text-xs text-olive-gray mb-6 leading-relaxed">
-                      配置您想让大模型提取的字段，并与云端多维表格的目标列进行匹配映射。
+                      配置您想让模型提取的字段，并与云端多维表格的目标列进行匹配映射。
                     </p>
 
                     <div className="border border-border-cream rounded-lg overflow-x-auto bg-white mb-6 custom-scrollbar">
@@ -3124,10 +3124,10 @@ export default function DocumentExtractor({ presetId = null }) {
                         onChange={(e) => setCustomPrompt(e.target.value)}
                         disabled={!canCustomPrompt}
                         className="bg-warm-sand/30 border border-border-warm rounded-lg p-4 text-xs outline-none focus:bg-white focus:border-terracotta transition w-full min-h-[300px] font-sans disabled:opacity-60"
-                        placeholder="请输入大模型解析提示词..."
+                        placeholder="请输入模型解析提示词..."
                       />
                       <span className="text-xs text-stone-gray leading-normal">
-                        * 提示词在输入给大模型之前，会自动追加防注入审查语句规范约束。
+                        * 提示词在输入给模型之前，会自动追加防注入审查语句规范约束。
                       </span>
                     </div>
                   </section>
@@ -3264,7 +3264,7 @@ export default function DocumentExtractor({ presetId = null }) {
                 <div className="lg:col-span-1">
                   <section className="bg-ivory border border-border-cream rounded-xl p-4 sm:p-6 md:p-8 shadow-sm">
                     <h3 className="font-serif font-bold text-base border-b border-border-cream pb-3 mb-4 flex items-center gap-2">
-                      <span>📊</span> 推送配置面板
+                      推送配置面板
                     </h3>
 
                     {!canCustomPlatform && (
@@ -3508,7 +3508,7 @@ export default function DocumentExtractor({ presetId = null }) {
                     <div className="flex justify-between items-center mb-2">
                       <p className="text-xs font-bold text-olive-gray flex items-center gap-1.5 animate-pulse">
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-terracotta animate-ping" />
-                        <span>🤖 大模型实时解析输出中...</span>
+                        <span>模型实时解析输出中...</span>
                       </p>
                       <button
                         onClick={() => setIsLlmOutputExpanded(!isLlmOutputExpanded)}
@@ -3554,7 +3554,7 @@ export default function DocumentExtractor({ presetId = null }) {
                       <div>
                         <p className="font-bold">数据零推送熔断保护已激活</p>
                         <p className="mt-1 leading-relaxed">
-                          ❌ 深度提取未命中任何有效记录（大模型可能生成了空数据或触发了拒绝回答机制）。
+                          ❌ 深度提取未命中任何有效记录（模型可能生成了空数据或触发了拒绝回答机制）。
                           为防止多维表格被写入空行垃圾数据，系统已自动熔断。
                           请检查您的文件内容、提取字段中文名或提示词配置是否精准。
                         </p>
@@ -3566,7 +3566,7 @@ export default function DocumentExtractor({ presetId = null }) {
                           onClick={() => setIsLlmModalOpen(true)}
                           className="bg-red-100/50 hover:bg-red-100 text-error-crimson border border-red-200/50 px-3 py-1.5 rounded font-semibold flex items-center gap-1.5 transition"
                         >
-                          <span>🔍 查看AI原始 JSON 输出</span>
+                          <span>查看模型原始 JSON 输出</span>
                         </button>
                       </div>
                     )}
@@ -3580,7 +3580,7 @@ export default function DocumentExtractor({ presetId = null }) {
                     {tokenUsage && (
                       <div className="flex flex-wrap items-center gap-2 sm:gap-4 md:gap-6 bg-warm-sand/20 border border-border-cream rounded-lg p-3 sm:p-4 text-xs font-semibold text-olive-gray">
                         <div className="flex items-center gap-2">
-                          <span>📊 AI模型开销:</span>
+                          <span> AI模型开销:</span>
                         </div>
                         <div>
                           输入 <span className="text-near-black font-bold">{tokenUsage.promptTokens?.toLocaleString()}</span>
@@ -3625,7 +3625,7 @@ export default function DocumentExtractor({ presetId = null }) {
                             onClick={() => setIsLlmModalOpen(true)}
                             className="border border-stone-gray hover:border-near-black text-olive-gray hover:text-near-black px-3.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition bg-white shadow-xs"
                           >
-                            <span>🤖 查看 LLM 原始输出</span>
+                            <span>查看模型原始输出</span>
                           </button>
                         )}
 
@@ -3984,8 +3984,8 @@ export default function DocumentExtractor({ presetId = null }) {
             >
               <div className="flex items-center justify-between border-b border-border-cream pb-3 mb-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">🤖</span>
-                  <h3 className="font-serif font-bold text-base">大模型原始 JSON 响应报文</h3>
+                  <span className="text-lg"></span>
+                  <h3 className="font-serif font-bold text-base">模型原始 JSON 响应报文</h3>
                 </div>
                 <button
                   onClick={() => setIsLlmModalOpen(false)}
